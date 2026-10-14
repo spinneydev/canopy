@@ -22,6 +22,9 @@ if ((BASH_VERSINFO[0] < 4)); then
 fi
 
 HERE=$(cd "$(dirname "$0")" && pwd)
+# The config folder, as for install.sh: config/ here, or CANOPY_CONFIG_DIR.
+CONFIG_DIR=$(cd "${CANOPY_CONFIG_DIR:-$HERE/config}" && pwd) ||
+	{ echo "update.sh: no config folder at ${CANOPY_CONFIG_DIR:-$HERE/config}" >&2; exit 1; }
 
 die() {
 	printf 'update.sh: %s\n' "$*" >&2
@@ -45,7 +48,7 @@ for arg; do
 		;;
 	esac
 done
-TARGET=${TARGET:-$(sed -n 's/^target=//p' "$HERE/config/deploy.env" 2>/dev/null)}
+TARGET=${TARGET:-$(sed -n 's/^target=//p' "$CONFIG_DIR/deploy.env" 2>/dev/null)}
 [[ -n $TARGET ]] || die "which server? ./update.sh USER@HOST (or deploy once with install.sh, which remembers it)"
 
 command -v go >/dev/null || die "go not found"
@@ -67,7 +70,8 @@ trap 'rm -rf "$stage"' EXIT
 
 say "Building canopy for linux/$goarch"
 (cd "$HERE" && CGO_ENABLED=0 GOOS=linux GOARCH=$goarch go build -trimpath -o "$stage/canopy" .)
-cp -R "$HERE/config" "$stage/"
+mkdir "$stage/config"
+cp -R "$CONFIG_DIR/." "$stage/config/"
 rm -f "$stage/config/deploy.env"
 # Kept next to install-command.sh, so a later install.sh run on the server
 # matches this version.

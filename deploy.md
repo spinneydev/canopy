@@ -52,6 +52,16 @@ You can leave the title and clone address at their placeholders: the
 deploy fills them in from your domain. Check the file with
 `go run . -check`.
 
+To keep a server's settings out of the canopy checkout, in a repository of
+their own, put them in a folder laid out like `config/` and point the
+scripts at it with `CANOPY_CONFIG_DIR`. The answers (`deploy.env`) are then
+saved there too:
+
+```sh
+CANOPY_CONFIG_DIR=~/git.example.com/config ./install.sh root@your-server
+CANOPY_CONFIG_DIR=~/git.example.com/config ./update.sh
+```
+
 ## 2. DNS and the provider's firewall
 
 1. At your DNS provider, create an **A** record for `git.example.com` with
@@ -237,7 +247,7 @@ once: `git clone ~/backups/git/project.git /tmp/restore-test`.
 
 | Task | How |
 |---|---|
-| Change a setting, the about page or the icon | Edit the files in `config/`, then `./update.sh`. If the config was edited on the server, it stops and shows the difference; `./update.sh --force` overwrites it. |
+| Change a setting, the about page or the icon | Edit the files in `config/` (or your `CANOPY_CONFIG_DIR` folder), then `./update.sh`. If the config was edited on the server, it stops and shows the difference; `./update.sh --force` overwrites it. |
 | Update canopy | `git pull` in the canopy folder, then `./update.sh`. Or, on a server installed with `--self-update`: `sudo canopy-update` there (see below). |
 | Add or remove a push key | Run `./install.sh alice@server…` without `--yes` and change the key list (it is the complete list). |
 | Let another account log in over SSH | On the server: `~/canopy/install-command.sh --ssh-allow NAME` (remembered from then on). |

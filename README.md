@@ -146,7 +146,7 @@ slashes.
     config/              your settings, about page and icon
     demo/                sample repositories and their config
     install.sh           installer and remote deploy (also writes canopy-update)
-    update.sh            quick redeploy of canopy and config/ only
+    update.sh            quick redeploy of canopy and config/ only (or CANOPY_CONFIG_DIR)
 
 Development: `go test ./...`, `go vet ./...`, `gofmt -l .` and
 `shellcheck install.sh update.sh` must all be clean. See

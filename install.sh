@@ -48,9 +48,13 @@ declare -A ANUBIS_SHA256=(
 )
 
 HERE=$(cd "$(dirname "$0")" && pwd)
+# The config folder: config/ next to this script, or CANOPY_CONFIG_DIR, e.g.
+# one kept in its own repository with a server's settings.
+CONFIG_DIR=$(cd "${CANOPY_CONFIG_DIR:-$HERE/config}" && pwd) ||
+	{ echo "install.sh: no config folder at ${CANOPY_CONFIG_DIR:-$HERE/config}" >&2; exit 1; }
 
 # Options and their defaults.
-SOURCE_CONFIG=$HERE/config/canopy.toml
+SOURCE_CONFIG=$CONFIG_DIR/canopy.toml
 DOMAIN=
 EMAIL=
 CADDY=
@@ -144,7 +148,9 @@ With USER@HOST (or an ssh config alias, or ssh://USER@HOST:PORT), it runs on
 your own machine: asks for the domain and the other choices below (flags
 given on the command line answer them), builds canopy for the server,
 uploads it with config/ and runs the install there over SSH. Answers are
-saved in config/deploy.env and offered as defaults the next time.
+saved in config/deploy.env and offered as defaults the next time. To keep
+a server's config folder elsewhere (its own repository, say), set
+CANOPY_CONFIG_DIR to it.
 
   -y, --yes            take the saved or default answers without asking
 
@@ -371,7 +377,7 @@ fi
 # Deploying to a server over SSH (./install.sh user@host)
 
 if ((DEPLOY)); then
-	ANSWERS=$HERE/config/deploy.env
+	ANSWERS=$CONFIG_DIR/deploy.env
 	# Extra ssh options for every connection, e.g. DEPLOY_SSH_OPTS="-F ./ssh_config".
 	read -ra ssh_opts <<<"${DEPLOY_SSH_OPTS:-}"
 
@@ -417,8 +423,8 @@ if ((DEPLOY)); then
 		done <"$ANSWERS"
 	fi
 
-	[[ $SOURCE_CONFIG == "$HERE/config/canopy.toml" ]] ||
-		die "--config isn't used when deploying; the config/ folder is uploaded as it is"
+	[[ $SOURCE_CONFIG == "$CONFIG_DIR/canopy.toml" ]] ||
+		die "--config isn't used when deploying; the config folder is uploaded as it is (set CANOPY_CONFIG_DIR to use another)"
 	((UNDO_SSH)) && die "--undo-ssh-hardening runs on the server itself (sudo ~/canopy/install.sh --undo-ssh-hardening)"
 	command -v ssh >/dev/null || die "ssh not found"
 
@@ -608,7 +614,7 @@ if ((DEPLOY)); then
 
 		# The site title lives in the config; offer to set it while it's the
 		# default. The config is only changed once the summary is confirmed.
-		cfg=$HERE/config/canopy.toml
+		cfg=$CONFIG_DIR/canopy.toml
 		if grep -qx 'title = "git"' "$cfg"; then
 			ask title "Site title" "$DOMAIN"
 			[[ $title != *[\"\\]* && $title != *[[:cntrl:]]* ]] || die "the title can't contain quotes or backslashes"
@@ -617,7 +623,7 @@ if ((DEPLOY)); then
 			set_clone=1
 		fi
 		# The about page's example clone command, while it's the placeholder.
-		about=$HERE/config/about.md
+		about=$CONFIG_DIR/about.md
 		[[ $DOMAIN != git.example.com ]] && grep -qF 'git.example.com' "$about" 2>/dev/null && set_about=1
 	fi
 	check_options
@@ -713,7 +719,8 @@ if ((DEPLOY)); then
 			(cd "$HERE" && CGO_ENABLED=0 GOOS=linux GOARCH=$goarch go build -trimpath -o "$stage/canopy" .)
 		fi
 		cp "$HERE/install.sh" "$stage/"
-		cp -R "$HERE/config" "$stage/"
+		mkdir "$stage/config"
+		cp -R "$CONFIG_DIR/." "$stage/config/"
 		rm -f "$stage/config/deploy.env"
 		if ((${#PUSH_KEYS[@]})); then
 			cat "${PUSH_KEYS[@]}" >"$stage/push-keys.pub"
