@@ -142,6 +142,7 @@ func printConfig(path string, cfg *config.Config) {
 	fmt.Printf("favicon: %s\n", absOrEmpty(cfg.Favicon))
 	fmt.Printf("about: %s\n", absOrEmpty(cfg.About))
 	fmt.Printf("owner: %s\n", cfg.Owner)
+	fmt.Printf("owner_url: %s\n", cfg.OwnerURL)
 	fmt.Printf("tree_commits: %v\n", cfg.TreeCommits)
 	fmt.Printf("activity: %v\n", cfg.Activity.Enabled)
 	fmt.Printf("activity.emails: %s\n", strings.Join(cfg.Activity.Emails, " "))

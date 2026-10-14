@@ -66,6 +66,24 @@ func TestActivityIsChecked(t *testing.T) {
 	}
 }
 
+func TestOwnerURLIsChecked(t *testing.T) {
+	dir := t.TempDir()
+	ok := "owner = \"you\"\nowner_url = \"https://example.com\"\n"
+	if _, err := Load(writeConfig(t, dir, ok)); err != nil {
+		t.Fatalf("%s: %v", ok, err)
+	}
+	for body, want := range map[string]string{
+		"owner = \"you\"\nowner_url = \"example.com\"":         "must start with",
+		"owner = \"you\"\nowner_url = \"javascript:alert(1)\"": "must start with",
+		"owner_url = \"https://example.com\"":                  "set owner too",
+	} {
+		_, err := Load(writeConfig(t, dir, body+"\n"))
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: got %v, want an error containing %q", body, err, want)
+		}
+	}
+}
+
 func TestThemeIsChecked(t *testing.T) {
 	dir := t.TempDir()
 	ok := "[theme]\nsans = \"Inter\"\nmono = \"JetBrains Mono\"\nlight = \"ayu-light\"\ndark = \"my-dark\"\n" +

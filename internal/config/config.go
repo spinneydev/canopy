@@ -27,6 +27,7 @@ type Config struct {
 	Favicon     string `toml:"favicon"`      // .svg, .png or .ico file; a built-in icon if empty
 	About       string `toml:"about"`        // markdown file shown as the site's about page
 	Owner       string `toml:"owner"`        // owner of top-level repositories on the index
+	OwnerURL    string `toml:"owner_url"`    // owner's website; the footer then credits Owner with a link to it
 	TreeCommits bool   `toml:"tree_commits"` // each tree entry's last commit on tree pages
 
 	Clone      Clone                        `toml:"clone"`
@@ -129,6 +130,14 @@ func Load(path string) (*Config, error) {
 	}
 	if err := checkFile("about", cfg.About, ".md", ".markdown"); err != nil {
 		return nil, err
+	}
+	if cfg.OwnerURL != "" {
+		if !strings.HasPrefix(cfg.OwnerURL, "https://") && !strings.HasPrefix(cfg.OwnerURL, "http://") {
+			return nil, fmt.Errorf("owner_url: %q must start with https:// or http://", cfg.OwnerURL)
+		}
+		if cfg.Owner == "" {
+			return nil, fmt.Errorf("owner_url: set owner too, the name the footer links")
+		}
 	}
 	for name, url := range cfg.Mirrors {
 		if err := checkMirror(name, url, cfg.Depth); err != nil {

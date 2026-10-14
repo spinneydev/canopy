@@ -7,7 +7,7 @@ canopy's look can change in four ways, all in `config/canopy.toml`:
 | Colour theme, light and dark | `[theme] light`, `dark` | [1](#1-pick-a-theme) |
 | Your own colour theme | `[themes."name"]` | [2](#2-make-your-own-theme) |
 | Fonts for text and code | `[theme] sans`, `mono` | [3](#3-fonts) |
-| Site name, tagline, icon, about page | `title`, `header`, `description`, `favicon`, `about` | [config/README.md](config/README.md#settings) |
+| Site name, tagline, icon, about page, footer credit | `title`, `header`, `description`, `favicon`, `about`, `owner_url` | [config/README.md](config/README.md#settings) |
 
 Nothing else can change: there is no custom CSS file. Every value is
 checked to be a theme name, a colour or a font name, so the config can't

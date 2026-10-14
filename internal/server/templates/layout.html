@@ -18,7 +18,7 @@
 {{block "content" .}}{{end}}
 </main>
 <footer class="container footer">
-  served by <a href="/">{{.Site}}</a> · powered by <a href="https://canopy.spinney.dev">canopy</a> · last update: {{ago .Started}}
+  served by {{if .OwnerURL}}<a href="{{.OwnerURL}}">{{.SiteOwner}}</a>{{else}}<a href="/">{{.Site}}</a>{{end}} · powered by <a href="https://canopy.spinney.dev">canopy</a> · last update: {{ago .Started}}
 </footer>
 </body>
 </html>

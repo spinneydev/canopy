@@ -66,6 +66,7 @@ config/canopy.toml: unknown keys: titel
 | `about` | none | Markdown file shown under an **about** tab next to **index** (like cgit's `root-readme`). Starts as [`about.md`](about.md) in this folder. Remove the setting to drop the tab. |
 | `favicon` | built-in icon | The browser tab icon: an `.svg`, `.png` or `.ico` file. |
 | `owner` | none | Owner shown on the index for repositories at the top of `root`. One in a folder is owned by that folder, so `torvalds/linux.git` shows `torvalds`; `[repos."name"] owner` overrides both. A folder named like `owner` (`alice/…` with `owner = "alice"`) is listed right after the top-level repositories, before the other folders. |
+| `owner_url` | none | The owner's website, starting with `https://` or `http://`. The footer then says "served by" `owner`, linking here, instead of the site's `title` linking to the index. Needs `owner`. |
 | `tree_commits` | `false` | `true` to show, on tree pages, the last commit that changed each file or folder (its subject and age), like GitHub's file list. It costs one `git log` per tree page; on a long history, entries untouched in the last 5000 commits of that folder are shown without one. The subject is hidden on narrow screens. |
 
 `about` and `favicon` are paths relative to this file and are checked when

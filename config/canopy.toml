@@ -28,6 +28,10 @@ description = ""
 # folder are owned by it: torvalds/linux.git shows "torvalds".
 # owner = "you"
 
+# The owner's website. The footer then says "served by you", linking here,
+# instead of naming the site.
+# owner_url = "https://example.com"
+
 # An "about" tab next to "index", showing this markdown file (next to this
 # config). Remove the line to drop the tab.
 about = "about.md"

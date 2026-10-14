@@ -89,6 +89,8 @@ Everything is in [`config/canopy.toml`](config/canopy.toml):
 
 - `listen`, `root` (the folder of repositories), `depth`, `title`,
   `description`, `about` (a markdown page for an **about** tab), `favicon`
+- `owner`: who the top-level repositories belong to, and `owner_url`:
+  their website, linked from the footer ("served by you")
 - `[clone] http`: the base URL shown in clone commands
 - `[activity]`: an **activity** tab with a year of commits as a
   GitHub-style graph (off unless `enabled = true`; mirrors never count)

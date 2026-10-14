@@ -341,6 +341,8 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		return
 	}
 	data["Site"] = s.cfg.Title
+	data["SiteOwner"] = s.cfg.Owner
+	data["OwnerURL"] = s.cfg.OwnerURL
 	data["Header"] = cmp.Or(s.cfg.Header, s.cfg.Title)
 	data["SiteDescription"] = s.description
 	data["HasAbout"] = s.cfg.About != ""
