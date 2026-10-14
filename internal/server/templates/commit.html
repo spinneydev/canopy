@@ -1,0 +1,60 @@
+{{define "header"}}{{template "repoheader" .}}{{end}}
+
+{{define "content"}}
+{{$sig := index .Sigs .C.Hash}}
+{{template "event" dict "Repo" .Repo "C" .C "Labels" (index .Labels .C.Hash) "Sig" $sig "Full" true}}
+<dl class="kv commit-meta">
+  <dt>author</dt>
+  <dd>{{.C.Author.Name}} &lt;{{.C.Author.Email}}&gt; <span class="muted">{{date .C.Author.When}}</span></dd>
+  {{if or (ne .C.Author.Email .C.Committer.Email) (ne .C.Author.Name .C.Committer.Name)}}
+  <dt>committer</dt>
+  <dd>{{.C.Committer.Name}} &lt;{{.C.Committer.Email}}&gt; <span class="muted">{{date .C.Committer.When}}</span></dd>
+  {{end}}
+  {{with $sig.Label}}
+  <dt>signature</dt>
+  <dd>{{template "sig" $sig}} <span class="muted">{{$sig.Note}}</span></dd>
+  {{end}}
+  <dt>commit</dt>
+  <dd class="mono">{{.C.Hash}}</dd>
+  {{range .C.Parents}}
+  <dt>parent</dt>
+  <dd class="mono"><a href="{{$.Repo.URL "commit" .}}">{{.}}</a></dd>
+  {{end}}
+  <dt>tree</dt>
+  <dd><a href="{{.Repo.ItemURL "tree" .C.Hash ""}}">browse</a> <a href="{{.Repo.URL "commit" (printf "%s.patch" .C.Hash)}}">patch</a></dd>
+</dl>
+
+<div class="diffstat">
+  <p>{{plural (len .Diff.Files) "file"}} changed, <span class="add">{{plural .Diff.Added "insertion"}}(+)</span>, <span class="del">{{plural .Diff.Deleted "deletion"}}(-)</span></p>
+  <table>
+    {{range $i, $f := .Diff.Files}}
+    <tr>
+      <td class="status s-{{.Status}}">{{.Status}}</td>
+      <td class="path"><a href="#file-{{$i}}">{{if eq .Status "R" "C"}}{{.OldPath}} &rarr; {{end}}{{.Path}}</a></td>
+      <td class="num add">+{{.Added}}</td>
+      <td class="num del">-{{.Deleted}}</td>
+    </tr>
+    {{end}}
+  </table>
+  {{if .Diff.Truncated}}<p class="notice">This diff is too large and has been truncated.</p>{{end}}
+</div>
+
+{{range $i, $f := .Diff.Files}}
+<div class="file-diff" id="file-{{$i}}">
+  <div class="file-diff-header">
+    <span class="status s-{{.Status}}">{{.Status}}</span>
+    <span class="path">{{if eq .Status "R" "C"}}{{.OldPath}} &rarr; {{end}}{{.Path}}</span>
+    {{if and .OldMode .NewMode}}<span class="muted">mode {{.OldMode}} &rarr; {{.NewMode}}</span>{{end}}
+    {{with .Similarity}}<span class="muted">{{.}} similar</span>{{end}}
+    <span class="spacer"></span>
+    {{if ne .Status "D"}}<a href="{{$.Repo.ItemURL "tree" $.C.Hash .Path}}">view</a>{{end}}
+  </div>
+  {{if .Binary}}<div class="notice">Binary file changed.</div>{{end}}
+  {{if .Hunks}}
+  <pre class="diff">{{range .Hunks}}<span class="hunk">{{.Header}}</span>
+{{- range .Lines}}<span class="{{lineclass .Kind}}">{{printf "%c" .Kind}}{{.Text}}</span>{{end}}{{end}}</pre>
+  {{end}}
+  {{if .Truncated}}<div class="notice">This file's diff is too large and has been truncated.</div>{{end}}
+</div>
+{{end}}
+{{end}}

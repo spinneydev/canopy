@@ -1,0 +1,53 @@
+{{define "header"}}{{template "repoheader" .}}{{end}}
+
+{{define "content"}}
+<div class="row">
+  <div class="col-main">
+    <h3>tags{{if gt .Pages 1}} <small class="muted">{{.TagCount}}</small>{{end}}</h3>
+    {{range .Tags}}
+    <div class="event">
+      <h4>
+        <a href="{{$.Repo.ItemURL "tree" .Name ""}}">{{.Name}}</a>
+        <small class="muted"><time title="{{date .When}}">{{ago .When}}</time></small>
+        {{if .Annotated}}{{template "sig" index $.Sigs .Hash}}{{end}}
+      </h4>
+      {{if .Annotated}}{{with .Message}}<pre class="commit-msg">{{.}}</pre>{{end}}{{end}}
+      <div class="links">
+        <a href="{{$.Repo.ItemURL "tree" .Name ""}}">browse</a>
+        <a href="{{$.Repo.ItemURL "log" .Name ""}}">log</a>
+        {{if not $.Repo.Upstream}}<a href="{{$.Repo.URL "archive" (printf "%s.tar.gz" .Name)}}">.tar.gz</a>{{end}}
+      </div>
+    </div>
+    {{else}}
+    <p class="muted">No tags.</p>
+    {{end}}
+    {{if gt .Pages 1}}
+    <div class="pager">
+      {{if gt .Page 2}}<a class="btn" href="{{.Repo.URL "refs"}}">&laquo; newest</a>{{end}}
+      {{if gt .Page 1}}<a class="btn" href="{{.Repo.URL "refs"}}{{if gt .Page 2}}?page={{add .Page -1}}{{end}}">&lsaquo; newer</a>{{end}}
+      <span class="muted">page {{.Page}} of {{.Pages}}</span>
+      {{if lt .Page .Pages}}<a class="btn" href="{{.Repo.URL "refs"}}?page={{add .Page 1}}">older &rsaquo;</a>{{end}}
+    </div>
+    {{end}}
+  </div>
+  <div class="col-side">
+    <h3>branches</h3>
+    {{range .Branches}}
+    <div class="event">
+      <h4>
+        <a href="{{$.Repo.ItemURL "tree" .Name ""}}">{{.Name}}</a>
+        {{if eq .Name $.Default}}<span class="ref-label branch">default</span>{{end}}
+      </h4>
+      <p class="branch-head"><a class="hash" href="{{$.Repo.URL "commit" .Commit}}">{{short .Commit}}</a> {{.Subject}} <small class="muted"><time title="{{date .When}}">{{ago .When}}</time></small></p>
+      <div class="links">
+        <a href="{{$.Repo.ItemURL "tree" .Name ""}}">browse</a>
+        <a href="{{$.Repo.ItemURL "log" .Name ""}}">log</a>
+        {{if not $.Repo.Upstream}}<a href="{{$.Repo.URL "archive" (printf "%s.tar.gz" .Name)}}">.tar.gz</a>{{end}}
+      </div>
+    </div>
+    {{else}}
+    <p class="muted">No branches.</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,9 @@
+{{define "header"}}{{template "siteheader" .}}{{end}}
+
+{{define "content"}}
+<div class="error-page">
+  <h2>{{.Title}}</h2>
+  <p>{{.Message}}</p>
+  <p><a class="btn" href="/">Back to repositories</a></p>
+</div>
+{{end}}

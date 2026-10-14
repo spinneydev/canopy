@@ -1,0 +1,35 @@
+{{define "header"}}{{template "repoheader" .}}{{end}}
+
+{{define "content"}}
+{{with .Last}}{{template "event" dict "Repo" $.Repo "C" . "Labels" nil "Full" false}}{{end}}
+<div class="file-bar">
+  <div class="file-path">{{template "crumbs" .}}</div>
+  <div class="file-actions">
+    <span class="muted">{{size .Size}}</span>
+    {{template "refchip" .Ref}}
+    {{if .IsMarkdown}}
+    {{if .Markdown}}<a class="btn" href="{{.Repo.ItemURL "tree" .Ref .Path}}?plain=1">source</a>
+    {{else}}<a class="btn" href="{{.Repo.ItemURL "tree" .Ref .Path}}">rendered</a>{{end}}
+    {{end}}
+    <a class="btn" href="{{.Repo.ItemURL "log" .Ref .Path}}">log</a>
+    <a class="btn" href="{{.Repo.ItemURL "blame" .Ref .Path}}">blame</a>
+    <a class="btn" href="{{.Repo.ItemURL "blob" .Ref .Path}}">view raw</a>
+  </div>
+</div>
+{{if .Image}}
+<div class="blob-image"><img src="{{.Repo.ItemURL "blob" .Ref .Path}}" alt="{{.Path}}"></div>
+{{else if .Binary}}
+<div class="notice">Binary file not shown. <a href="{{.Repo.ItemURL "blob" .Ref .Path}}">Download it</a> instead.</div>
+{{else if .Markdown}}
+<div class="markdown rendered-file">{{.Markdown}}</div>
+{{else if .TooLarge}}
+<div class="notice">This file is too large to display. <a href="{{.Repo.ItemURL "blob" .Ref .Path}}">View it raw</a> instead.</div>
+{{else}}
+<div class="code-view">
+<pre class="line-numbers">{{range $i, $_ := .Lines}}<a id="L{{add $i 1}}" href="#L{{add $i 1}}">{{add $i 1}}</a>
+{{end}}</pre>
+<pre class="code chroma">{{range .Lines}}{{.}}
+{{end}}</pre>
+</div>
+{{end}}
+{{end}}

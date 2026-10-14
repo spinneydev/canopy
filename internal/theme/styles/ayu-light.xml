@@ -1,0 +1,36 @@
+<style name="ayu-light">
+  <entry type="Background" style="bg:#f8f9fa #5c6166"/>
+  <entry type="Error" style="#e65050"/>
+  <entry type="Keyword" style="#fa8d3e"/>
+  <entry type="KeywordConstant" style="#a37acc"/>
+  <entry type="KeywordType" style="#399ee6"/>
+  <entry type="Name" style="#5c6166"/>
+  <entry type="NameAttribute" style="#f2ae49"/>
+  <entry type="NameBuiltin" style="#f07171"/>
+  <entry type="NameClass" style="#399ee6"/>
+  <entry type="NameConstant" style="#a37acc"/>
+  <entry type="NameDecorator" style="#e6ba7e"/>
+  <entry type="NameException" style="#399ee6"/>
+  <entry type="NameFunction" style="#f2ae49"/>
+  <entry type="NameNamespace" style="#399ee6"/>
+  <entry type="NameProperty" style="#f07171"/>
+  <entry type="NameTag" style="#55b4d4"/>
+  <entry type="NameVariable" style="#5c6166"/>
+  <entry type="Literal" style="#a37acc"/>
+  <entry type="LiteralString" style="#86b300"/>
+  <entry type="LiteralStringEscape" style="#4cbf99"/>
+  <entry type="LiteralStringRegex" style="#4cbf99"/>
+  <entry type="LiteralStringDoc" style="italic #adaeb1"/>
+  <entry type="LiteralNumber" style="#a37acc"/>
+  <entry type="Operator" style="#ed9366"/>
+  <entry type="Punctuation" style="#5c6166"/>
+  <entry type="Comment" style="italic #adaeb1"/>
+  <entry type="CommentPreproc" style="#fa8d3e"/>
+  <entry type="GenericDeleted" style="#e65050"/>
+  <entry type="GenericInserted" style="#6cbf43"/>
+  <entry type="GenericEmph" style="italic"/>
+  <entry type="GenericStrong" style="bold"/>
+  <entry type="GenericHeading" style="bold #f2ae49"/>
+  <entry type="GenericSubheading" style="bold #399ee6"/>
+  <entry type="GenericError" style="#e65050"/>
+</style>

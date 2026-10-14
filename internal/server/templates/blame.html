@@ -1,0 +1,31 @@
+{{define "header"}}{{template "repoheader" .}}{{end}}
+
+{{define "content"}}
+<div class="file-bar">
+  <div class="file-path">blame: {{template "crumbs" .}}</div>
+  <div class="file-actions">
+    <span class="muted">{{size .Size}}</span>
+    {{template "refchip" .Ref}}
+    <a class="btn" href="{{.Repo.ItemURL "tree" .Ref .Path}}">view</a>
+    <a class="btn" href="{{.Repo.ItemURL "log" .Ref .Path}}">log</a>
+    <a class="btn" href="{{.Repo.ItemURL "blob" .Ref .Path}}">view raw</a>
+  </div>
+</div>
+{{if .Binary}}
+<div class="notice">Binary files cannot be blamed.</div>
+{{else if .TooLarge}}
+<div class="notice">This file is too large to blame.</div>
+{{else}}
+<div class="blame-view">
+<table class="blame chroma">
+{{range .Rows}}
+<tr{{if .Start}} class="start"{{end}}>
+  <td class="blame-info">{{if .Start}}<a class="hash" href="{{$.Repo.URL "commit" .Commit.Hash}}" title="{{.Commit.Summary}}">{{short .Commit.Hash}}</a> <span class="author">{{.Commit.Author}}</span> <time title="{{date .Commit.When}}">{{ago .Commit.When}}</time>{{end}}</td>
+  <td class="ln"><a id="L{{.No}}" href="#L{{.No}}">{{.No}}</a></td>
+  <td class="lc">{{.Code}}</td>
+</tr>
+{{end}}
+</table>
+</div>
+{{end}}
+{{end}}

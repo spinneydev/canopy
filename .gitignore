@@ -1,0 +1,9 @@
+# The built binary (go build).
+/canopy
+/canopy.exe
+
+# Sample repositories made by go run ./demo.
+/demo/repos/
+
+# Answers saved by ./install.sh USER@HOST: your server's settings.
+/config/deploy.env

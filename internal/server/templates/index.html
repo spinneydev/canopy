@@ -1,0 +1,32 @@
+{{define "header"}}{{template "siteheader" .}}{{end}}
+
+{{define "content"}}
+{{if .Search}}<p class="muted">{{.Count}} of {{.Total}} repositories match &ldquo;{{.Search}}&rdquo; · <a href="/{{if eq .Sort "name"}}?sort=name{{end}}">clear</a></p>{{end}}
+<table class="repo-list">
+  <thead>
+    <tr>
+      <th><a {{if eq .Sort "name"}}class="sorted"{{end}} href="/?sort=name{{with .Search}}&amp;search={{.}}{{end}}">Name</a></th>
+      <th class="desc">Description</th>
+      <th class="owner">Owner</th>
+      <th class="committer">Last committer</th>
+      <th><a {{if eq .Sort "idle"}}class="sorted"{{end}} href="/?sort=idle{{with .Search}}&amp;search={{.}}{{end}}">Idle</a></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Sections}}
+    {{with .Name}}<tr class="section"><td colspan="5">{{.}}</td></tr>{{end}}
+    {{range .Repos}}
+    <tr>
+      <td class="name{{if .Owner}} sub{{end}}"><a href="{{.URL}}">{{.Base}}</a></td>
+      <td class="desc">{{.Description}}</td>
+      <td class="owner">{{.Maintainer}}</td>
+      <td class="committer">{{.Committer}}</td>
+      <td class="idle">{{if .Updated.IsZero}}<span class="muted">empty</span>{{else}}<time title="{{date .Updated}}">{{age .Updated}}</time>{{end}}</td>
+    </tr>
+    {{end}}
+    {{else}}
+    <tr><td colspan="5" class="muted">{{if .Search}}No repositories match.{{else}}No repositories found.{{end}}</td></tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}

@@ -1,0 +1,36 @@
+{{define "header"}}{{template "repoheader" .}}{{end}}
+
+{{define "content"}}
+{{with .Last}}{{template "event" dict "Repo" $.Repo "C" . "Labels" nil "Full" false}}{{end}}
+<div class="file-bar">
+  <div class="file-path">{{template "crumbs" .}}</div>
+  <div class="file-actions">
+    {{template "refchip" .Ref}}
+    <a class="btn" href="{{.Repo.ItemURL "log" .Ref .Path}}">log</a>
+  </div>
+</div>
+<table class="tree-list">
+  {{if .Path}}
+  <tr><td class="mode"></td><td class="name"><a href="{{.Repo.ItemURL "tree" .Ref (parent .Path)}}">..</a></td>{{if .Commits}}<td class="last-commit"></td><td class="ago"></td>{{end}}<td class="size"></td></tr>
+  {{end}}
+  {{range .Entries}}
+  <tr>
+    <td class="mode">{{mode .Mode}}</td>
+    <td class="name">
+      {{- if eq .Type "commit"}}<span class="submodule">{{.Name}} @ {{short .Hash}}</span>
+      {{- else}}<a {{if eq .Type "tree"}}class="dir"{{end}} href="{{$.Repo.ItemURL "tree" $.Ref (join $.Path .Name)}}">{{.Name}}{{if eq .Type "tree"}}/{{end}}</a>{{end -}}
+    </td>
+    {{- if $.Commits}}
+    {{- with index $.Commits .Name}}
+    <td class="last-commit"><a href="{{$.Repo.URL "commit" .Hash}}" title="{{.Subject}}">{{.Subject}}</a></td>
+    <td class="ago"><time datetime="{{.Author.When.Format "2006-01-02T15:04:05Z07:00"}}" title="{{date .Author.When}}">{{ago .Author.When}}</time></td>
+    {{- else}}
+    <td class="last-commit"></td><td class="ago"></td>
+    {{- end}}
+    {{- end}}
+    <td class="size">{{if eq .Type "blob"}}{{size .Size}}{{end}}</td>
+  </tr>
+  {{end}}
+</table>
+{{with .Readme}}<div class="readme">{{.}}</div>{{end}}
+{{end}}

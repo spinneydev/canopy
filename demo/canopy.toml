@@ -1,0 +1,54 @@
+# Demo configuration. Generate the repositories first:
+#
+#     go run ./demo
+#     go run . -config demo/canopy.toml
+#
+# Relative paths are resolved against this file's directory.
+
+listen = "127.0.0.1:8080"
+root = "repos"
+title = "git.example.com"
+description = "Small tools, notes and experiments."
+about = "about.md"
+tree_commits = true
+
+[activity]
+enabled = true
+
+# Built-in themes: default, github-light, github-dark, ayu-light,
+# ayu-mirage, light-owl, night-owl, catppuccin-latte, catppuccin-frappe,
+# or one of yours from [themes] below. Fonts come from Google Fonts,
+# downloaded once by canopy (comment them out to try it offline).
+[theme]
+light = "catppuccin-latte"
+dark = "demo-dracula"
+sans = "Inter"
+mono = "JetBrains Mono"
+
+# Your own theme: try dark = "demo-dracula".
+[themes.demo-dracula]
+base = "night-owl"
+highlight = "dracula"
+bg = "#282a36"
+fg = "#f8f8f2"
+header-bg = "#21222c"
+event-bg = "#2f3241"
+code-bg = "#21222c"
+border = "#44475a"
+link = "#ff79c6"
+link-hover = "#ffb2e0"
+act-4 = "#ff79c6"
+
+# Signature badges: robin's commits and release tags show as verified.
+# Kim signs with a key not listed here, which shows as signed only.
+[signatures.keys]
+robin = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDV3BJFaJEgemWr6ImnBnaWn3YcyBhItxiNVOMDaFlmO robin@example"]
+
+[repos.tinyhttpd]
+homepage = "https://example.com/tinyhttpd/"
+
+[repos."lab/raytracer"]
+description = "A weekend ray tracer, written to learn the maths."
+
+[repos.secret]
+hidden = true

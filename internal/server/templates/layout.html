@@ -1,0 +1,25 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{if and .Title (ne .Title .Site)}}{{.Title}} - {{end}}{{.Site}}</title>
+<link rel="icon" href="/favicon.ico?v={{.V}}">
+<link rel="stylesheet" href="/_static/style.css?v={{.V}}">
+<link rel="stylesheet" href="/_static/chroma.css?v={{.V}}">
+{{if .HasFonts}}<link rel="stylesheet" href="/_static/fonts.css">
+{{end}}{{if .HasTheme}}<link rel="stylesheet" href="/_static/theme.css?v={{.V}}">
+{{end}}{{with .Repo}}<link rel="alternate" type="application/atom+xml" title="{{.Name}} commits" href="{{.URL "log.atom"}}">
+<link rel="alternate" type="application/atom+xml" title="{{.Name}} tags" href="{{.URL "tags.atom"}}">
+{{end}}</head>
+<body>
+{{block "header" .}}{{end}}
+<main class="container">
+{{block "content" .}}{{end}}
+</main>
+<footer class="container footer">
+  served by <a href="/">{{.Site}}</a> · powered by <a href="https://canopy.spinney.dev">canopy</a> · last update: {{ago .Started}}
+</footer>
+</body>
+</html>
+{{end}}

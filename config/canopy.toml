@@ -1,0 +1,95 @@
+# canopy configuration. Edit this file, then check it with
+#
+#     ./canopy -check
+#
+# and install or apply it with
+#
+#     sudo ./install.sh
+#
+# See README.md next to this file for every option.
+
+# Where to listen. Keep 127.0.0.1 when Caddy (install.sh --domain) is in
+# front; use ":8080" to serve directly on all interfaces.
+listen = "127.0.0.1:8080"
+
+# Folder holding the repositories (bare repos like foo.git, or work trees).
+root = "/srv/git"
+
+# How many folders deep to look for repositories under root.
+depth = 3
+
+# Site name in the browser tab and footer, and a tagline shown on the index
+# page. The top bar shows the title too, unless header is set.
+title = "git"
+# header = "git"
+description = ""
+
+# Owner shown on the index for repositories at the top of root. Those in a
+# folder are owned by it: torvalds/linux.git shows "torvalds".
+# owner = "you"
+
+# An "about" tab next to "index", showing this markdown file (next to this
+# config). Remove the line to drop the tab.
+about = "about.md"
+
+# The browser tab icon: an .svg, .png or .ico file next to this config.
+# Leave it out for the built-in icon.
+# favicon = "favicon.ico"
+
+# Show the last commit that changed each file and folder on tree pages.
+# tree_commits = true
+
+[clone]
+# Address shown for `git clone`. Leave it out to use the address the
+# visitor came in on.
+# http = "https://git.example.com"
+
+# An "activity" tab: a year of commits as a GitHub-style graph. Only the
+# commits of these author emails count (all, if left out); mirrors never do.
+#
+# [activity]
+# enabled = true
+# emails = ["you@example.com"]
+
+# Signature badges: commits and tags signed with one of these SSH keys show
+# as "verified", with the name given here. Others that are signed show as
+# "signed". Off until a key is listed.
+#
+# [signatures.keys]
+# alice = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... alice@laptop"]
+
+# Colour themes for visitors in light and dark mode: default, github-light,
+# github-dark, ayu-light, ayu-mirage, light-owl, night-owl, catppuccin-latte,
+# catppuccin-frappe, or your own from [themes]. Fonts are Google Fonts
+# families, downloaded once by canopy and served from this site, so
+# visitors never contact Google.
+#
+# [theme]
+# light = "github-light"
+# dark = "github-dark"
+# sans = "Inter"
+# mono = "JetBrains Mono"
+
+# Your own themes: a built-in one as the base, with some colours changed
+# (see README.md for the colour names and highlighting styles).
+#
+# [themes.my-dark]
+# base = "night-owl"
+# highlight = "dracula"
+# link = "#ff79c6"
+
+# Repositories you follow, kept up to date every 30 minutes (see README.md).
+#
+# [mirrors]
+# "torvalds/linux" = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"
+
+# Per-repository settings, keyed by the repo's name in the URL: its path
+# under root without ".git" (so /srv/git/tools/foo.git is "tools/foo").
+#
+# [repos.foo]
+# description = "Shown instead of the repo's description file"
+# homepage = "https://example.com/foo"
+# owner = "someone-else"
+#
+# [repos."tools/private"]
+# hidden = true

@@ -1,0 +1,36 @@
+<style name="night-owl">
+  <entry type="Background" style="bg:#011627 #d6deeb"/>
+  <entry type="Error" style="#ef5350"/>
+  <entry type="Keyword" style="italic #c792ea"/>
+  <entry type="KeywordConstant" style="#ff5874"/>
+  <entry type="KeywordType" style="#ffcb8b"/>
+  <entry type="Name" style="#d6deeb"/>
+  <entry type="NameAttribute" style="italic #addb67"/>
+  <entry type="NameBuiltin" style="#addb67"/>
+  <entry type="NameClass" style="#ffcb8b"/>
+  <entry type="NameConstant" style="#82aaff"/>
+  <entry type="NameDecorator" style="#c5e478"/>
+  <entry type="NameException" style="#ffcb8b"/>
+  <entry type="NameFunction" style="#82aaff"/>
+  <entry type="NameNamespace" style="#ffcb8b"/>
+  <entry type="NameProperty" style="#7fdbca"/>
+  <entry type="NameTag" style="#caece6"/>
+  <entry type="NameVariable" style="#d7dbe0"/>
+  <entry type="Literal" style="#f78c6c"/>
+  <entry type="LiteralString" style="#ecc48d"/>
+  <entry type="LiteralStringEscape" style="#f78c6c"/>
+  <entry type="LiteralStringRegex" style="#5ca7e4"/>
+  <entry type="LiteralStringDoc" style="italic #637777"/>
+  <entry type="LiteralNumber" style="#f78c6c"/>
+  <entry type="Operator" style="#c792ea"/>
+  <entry type="Punctuation" style="#c792ea"/>
+  <entry type="Comment" style="italic #637777"/>
+  <entry type="CommentPreproc" style="#c792ea"/>
+  <entry type="GenericDeleted" style="#ef5350"/>
+  <entry type="GenericInserted" style="#addb67"/>
+  <entry type="GenericEmph" style="italic"/>
+  <entry type="GenericStrong" style="bold"/>
+  <entry type="GenericHeading" style="bold #82aaff"/>
+  <entry type="GenericSubheading" style="bold #7fdbca"/>
+  <entry type="GenericError" style="#ef5350"/>
+</style>

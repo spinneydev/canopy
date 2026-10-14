@@ -1,0 +1,15 @@
+{{define "header"}}{{template "repoheader" .}}{{end}}
+
+{{define "content"}}
+<div class="file-bar">
+  <div class="file-path">{{if .Path}}log: {{template "crumbs" .}}{{else}}log{{end}}</div>
+  <div class="file-actions">{{template "refchip" .Ref}}</div>
+</div>
+<div class="event-list">
+  {{range .Commits}}{{template "event" dict "Repo" $.Repo "C" . "Labels" (index $.Labels .Hash) "Sig" (index $.Sigs .Hash) "Full" true}}{{else}}<p class="muted">No commits.</p>{{end}}
+</div>
+<div class="pager">
+  {{if .Paged}}<a class="btn" href="{{.Repo.ItemURL "log" .Ref .Path}}">&laquo; newest</a>{{end}}
+  {{with .Next}}<a class="btn" href="{{$.Repo.ItemURL "log" $.Ref $.Path}}?from={{.}}">next &raquo;</a>{{end}}
+</div>
+{{end}}

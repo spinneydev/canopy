@@ -1,0 +1,67 @@
+{{define "header"}}{{template "siteheader" .}}{{end}}
+
+{{define "content"}}
+{{with .A}}
+<h3 class="activity-total">{{plural .Total "commit"}} in {{.Period}}</h3>
+<div class="graph-box">
+<div class="graph-scroll">
+  <svg class="graph" width="{{.Width}}" height="{{.Height}}" viewBox="0 0 {{.Width}} {{.Height}}" role="img" aria-label="{{plural .Total "commit"}} in {{.Period}}, by day">
+    {{range .Months}}<text x="{{.X}}" y="{{.Y}}">{{.Name}}</text>{{end}}
+    {{range .Wdays}}<text x="{{.X}}" y="{{.Y}}">{{.Name}}</text>{{end}}
+    {{range .Days}}<rect x="{{.X}}" y="{{.Y}}" width="11" height="11" class="l{{.Level}}"><title>{{.Title}}</title></rect>{{end}}
+  </svg>
+</div>
+<p class="graph-legend muted">less
+  <svg width="68" height="11" viewBox="0 0 68 11" aria-hidden="true">
+    <rect x="0" width="11" height="11" class="l0"/><rect x="14" width="11" height="11" class="l1"/><rect x="28" width="11" height="11" class="l2"/><rect x="42" width="11" height="11" class="l3"/><rect x="56" width="11" height="11" class="l4"/>
+  </svg>
+  more</p>
+</div>
+
+<div class="row">
+  <div class="col-main">
+    <h3>{{if eq .Period "the last year"}}recent activity{{else}}activity in {{.Period}}{{end}}{{if gt .Pages 1}} <small class="muted">page {{.Page}} of {{.Pages}}</small>{{end}}</h3>
+    {{range .Events}}
+    <div class="event">
+      <div class="event-meta">
+        {{if .Tag}}tagged <a href="{{.Repo.ItemURL "tree" .Tag.Name ""}}">{{.Tag.Name}}</a> in
+        {{- else}}{{plural .Count "commit"}} to{{end}}
+        <a href="{{.Repo.URL}}">{{.Repo.Name}}</a>
+        <span class="ago"><time datetime="{{.When.Format "2006-01-02T15:04:05Z07:00"}}" title="{{date .When}}">{{ago .When}}</time></span>
+      </div>
+      {{if .Tag}}{{with .Tag.Subject}}<p class="activity-line">{{.}}</p>{{end}}
+      {{else}}
+      {{$repo := .Repo}}
+      <ul class="activity-commits">
+        {{range .Commits}}<li><a class="hash" href="{{$repo.URL "commit" .Hash}}" title="{{.Hash}}">{{short .Hash}}</a> {{.Subject}}</li>{{end}}
+        {{with .More}}<li><a href="{{$repo.URL "log"}}">{{plural . "more commit"}}</a></li>{{end}}
+      </ul>
+      {{end}}
+    </div>
+    {{else}}
+    <p class="muted">No commits or tags in {{.Period}}.</p>
+    {{end}}
+    {{if gt .Pages 1}}
+    <div class="pager">
+      {{with .Newer}}<a class="btn" href="{{.}}">&lsaquo; newer</a>{{end}}
+      {{with .Older}}<a class="btn" href="{{.}}">older &rsaquo;</a>{{end}}
+    </div>
+    {{end}}
+  </div>
+  <div class="col-side">
+    {{if gt (len .Years) 1}}
+    <h3>years</h3>
+    <ul class="activity-years">
+      {{range .Years}}<li><a {{if .Active}}class="active"{{end}} href="{{.URL}}">{{with .Year}}{{.}}{{else}}last year{{end}}</a></li>{{end}}
+    </ul>
+    {{end}}
+    {{with .Repos}}
+    <h3>repositories</h3>
+    <dl class="kv">
+      {{range .}}<dt><a href="{{.Repo.URL}}">{{.Repo.Name}}</a></dt><dd class="muted">{{plural .Count "commit"}}</dd>{{end}}
+    </dl>
+    {{end}}
+  </div>
+</div>
+{{end}}
+{{end}}

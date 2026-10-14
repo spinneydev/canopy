@@ -1,0 +1,63 @@
+{{define "repoheader"}}
+<div class="header-tabbed">
+  <div class="container">
+    <h2 class="repo-name">
+      {{- template "sitelink" .}}<span class="slash">/</span>
+      {{- with .Repo.Owner}}<a class="owner" href="/?search={{.}}">{{.}}</a>{{end -}}
+      <a href="{{.Repo.URL}}">{{.Repo.Base}}</a>
+    </h2>
+    {{with .Repo.Description}}<p class="repo-desc">{{.}}</p>{{end}}
+    <ul class="nav-tabs">
+      <li><a {{if eq .Tab "summary"}}class="active"{{end}} href="{{.Repo.URL}}">summary</a></li>
+      <li><a {{if eq .Tab "tree"}}class="active"{{end}} href="{{.Repo.URL "tree"}}">tree</a></li>
+      <li><a {{if eq .Tab "log"}}class="active"{{end}} href="{{.Repo.URL "log"}}">log</a></li>
+      <li><a {{if eq .Tab "refs"}}class="active"{{end}} href="{{.Repo.URL "refs"}}">refs</a></li>
+    </ul>
+  </div>
+</div>
+{{end}}
+
+{{define "event"}}
+<div class="event">
+  <div class="event-meta">
+    <a class="hash" href="{{.Repo.URL "commit" .C.Hash}}" title="{{.C.Hash}}">{{short .C.Hash}}</a>
+    <span class="sep">&mdash;</span>
+    <span class="author" title="{{.C.Author.Email}}">{{.C.Author.Name}}</span>
+    <a class="ago" href="{{.Repo.URL "commit" .C.Hash}}"><time datetime="{{.C.Author.When.Format "2006-01-02T15:04:05Z07:00"}}" title="{{date .C.Author.When}}">{{ago .C.Author.When}}</time></a>
+    {{range .Labels}}<a class="ref-label {{.Kind}}" href="{{.URL}}">{{.Name}}</a>{{end}}
+    {{with .Sig}}{{template "sig" .}}{{end}}
+  </div>
+  <pre class="commit-msg">{{if .Full}}{{.C.Message}}{{else}}{{.C.Subject}}{{end}}</pre>
+</div>
+{{end}}
+
+{{define "sig"}}{{with .Label}}<span class="sig {{$.Class}}" title="{{$.Note}}">{{.}}</span>{{end}}{{end}}
+
+{{define "crumbs"}}<span class="crumbs"><a href="{{.Repo.ItemURL "tree" .Ref ""}}">{{.Repo.Base}}</a>{{range .Crumbs}}<span class="slash">/</span><a href="{{$.Repo.ItemURL "tree" $.Ref .Path}}">{{.Name}}</a>{{end}}</span>{{end}}
+
+{{define "refchip"}}<span class="ref-chip" title="viewing {{.}}">{{.}}</span>{{end}}
+
+{{define "sitelink"}}<a class="site" href="/">{{.Header}}</a>{{end}}
+
+{{define "siteheader"}}
+<div class="header-tabbed">
+  <div class="container">
+    <h2 class="repo-name"><a class="site-home" href="/">{{.Header}}</a></h2>
+    {{with .SiteDescription}}<p class="repo-desc">{{.}}</p>{{end}}
+    <div class="tab-row">
+      <ul class="nav-tabs">
+        <li><a {{if eq .Tab "index"}}class="active"{{end}} href="/">index</a></li>
+        {{if .HasActivity}}<li><a {{if eq .Tab "activity"}}class="active"{{end}} href="/activity">activity</a></li>{{end}}
+        {{if .HasAbout}}<li><a {{if eq .Tab "about"}}class="active"{{end}} href="/about">about</a></li>{{end}}
+      </ul>
+      {{if eq .Tab "index"}}
+      <form class="search" method="get" action="/">
+        <input type="search" name="search" value="{{.Search}}" placeholder="search" aria-label="Search repositories">
+        {{if eq .Sort "name"}}<input type="hidden" name="sort" value="name">{{end}}
+        <button class="btn" type="submit">search</button>
+      </form>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
