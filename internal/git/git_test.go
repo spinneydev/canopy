@@ -109,6 +109,13 @@ func TestRepoConfigCannotRunCommands(t *testing.T) {
 	if err := r.WriteArchive(ctx, io.Discard, hash, "repo"); err != nil {
 		t.Fatal(err)
 	}
+	first := c.FirstParent()
+	if err := r.WriteDiff(ctx, io.Discard, first, hash); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.DiffBetween(ctx, "", hash); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := r.Refs(ctx, "refs/heads"); err != nil {
 		t.Fatal(err)
 	}

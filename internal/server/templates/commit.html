@@ -21,7 +21,7 @@
   <dd class="mono"><a href="{{$.Repo.URL "commit" .}}">{{.}}</a></dd>
   {{end}}
   <dt>tree</dt>
-  <dd><a href="{{.Repo.ItemURL "tree" .C.Hash ""}}">browse</a> <a href="{{.Repo.URL "commit" (printf "%s.patch" .C.Hash)}}">patch</a></dd>
+  <dd><a href="{{.Repo.ItemURL "tree" .C.Hash ""}}">browse</a> <a href="{{.Repo.URL "commit" (printf "%s.diff" .C.Hash)}}">diff</a> <a href="{{.Repo.URL "commit" (printf "%s.patch" .C.Hash)}}">patch</a></dd>
 </dl>
 
 <div class="diffstat">

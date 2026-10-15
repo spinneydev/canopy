@@ -309,14 +309,15 @@ func (s *Server) serveRepo(w http.ResponseWriter, r *http.Request, repo *Repo, r
 }
 
 // cached reports whether an action's pages carry pageNotModified's ETag.
-// Raw files, patches and tarballs depend only on what they are cut from,
-// and their handlers tag them by that instead.
+// Raw files, diffs, patches and tarballs depend only on what they are cut
+// from, and their handlers tag them by that instead.
 func cached(action string, rest []string) bool {
 	switch action {
 	case "", "tree", "blame", "log", "refs", "tag", "log.atom", "tags.atom":
 		return true
 	case "commit":
-		return !strings.HasSuffix(strings.Join(rest, "/"), ".patch")
+		_, raw := cutRaw(strings.Join(rest, "/"))
+		return raw == ""
 	}
 	return false
 }

@@ -530,26 +530,47 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p 
 	})
 }
 
+// cutRaw splits off name's ".diff" or ".patch", which ask for a commit as
+// plain text.
+func cutRaw(name string) (rest, ext string) {
+	for _, ext := range []string{".diff", ".patch"} {
+		if rest, ok := strings.CutSuffix(name, ext); ok {
+			return rest, ext
+		}
+	}
+	return name, ""
+}
+
+// plainText marks a response as text that browsers must not take for
+// anything else.
+func plainText(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+}
+
 func (s *Server) commit(w http.ResponseWriter, r *http.Request, repo *Repo, rev string) {
 	ctx := r.Context()
-	rev, patch := strings.CutSuffix(rev, ".patch")
+	rev, raw := cutRaw(rev)
 	hash, err := repo.ResolveCommit(ctx, rev)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	if patch {
-		if notModified(w, r, `"`+hash+`"`) {
-			return
-		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		repo.WritePatch(ctx, w, hash)
-		return
-	}
 	c, err := repo.Commit(ctx, hash)
 	if err != nil {
 		s.fail(w, r, err)
+		return
+	}
+	if raw != "" {
+		if notModified(w, r, `"`+hash+`"`) {
+			return
+		}
+		plainText(w)
+		if raw == ".patch" {
+			repo.WritePatch(ctx, w, hash)
+		} else {
+			repo.WriteDiff(ctx, w, c.FirstParent(), hash)
+		}
 		return
 	}
 	diff, err := repo.Diff(ctx, c)

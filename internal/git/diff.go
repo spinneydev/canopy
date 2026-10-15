@@ -51,13 +51,32 @@ type Diff struct {
 
 // Diff returns the changes introduced by c relative to its first parent.
 func (r *Repo) Diff(ctx context.Context, c *Commit) (*Diff, error) {
-	args := []string{"diff-tree", "-p", "-M", "--no-commit-id", "--root", "--no-textconv", "--no-ext-diff"}
-	if len(c.Parents) > 0 {
-		args = append(args, c.Parents[0])
-	}
-	args = append(args, c.Hash)
+	return r.DiffBetween(ctx, c.FirstParent(), c.Hash)
+}
 
-	cmd := r.cmd(ctx, args...)
+// FirstParent is the commit c follows on its branch, or "" for a root
+// commit.
+func (c *Commit) FirstParent() string {
+	if len(c.Parents) == 0 {
+		return ""
+	}
+	return c.Parents[0]
+}
+
+// diffArgs runs diff-tree from commit from to commit to. With from empty,
+// to's whole tree counts as added, as for a root commit.
+func diffArgs(from, to string) []string {
+	args := []string{"diff-tree", "-p", "-M", "--no-commit-id", "--root", "--no-textconv", "--no-ext-diff"}
+	if from != "" {
+		args = append(args, from)
+	}
+	return append(args, to)
+}
+
+// DiffBetween returns the changes from commit from to commit to (see
+// diffArgs).
+func (r *Repo) DiffBetween(ctx context.Context, from, to string) (*Diff, error) {
+	cmd := r.cmd(ctx, diffArgs(from, to)...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -73,6 +92,14 @@ func (r *Repo) Diff(ctx context.Context, c *Commit) (*Diff, error) {
 	cmd.Process.Kill()
 	cmd.Wait()
 	return d, nil
+}
+
+// WriteDiff streams the changes from commit from to commit to (see
+// diffArgs) as a plain unified diff.
+func (r *Repo) WriteDiff(ctx context.Context, w io.Writer, from, to string) error {
+	cmd := r.cmd(ctx, diffArgs(from, to)...)
+	cmd.Stdout = w
+	return cmd.Run()
 }
 
 func parseDiff(rd io.Reader) *Diff {

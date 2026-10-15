@@ -58,7 +58,7 @@ func TestPagesAnswerNotModified(t *testing.T) {
 	}
 
 	urls := []string{"/proj", "/proj/log", "/proj/refs", "/proj/tag/v1", "/proj/tree/main/item/a.txt",
-		"/proj/blob/main/item/a.txt", "/proj/commit/v1.patch", "/proj/archive/v1.tar.gz", "/proj/log.atom"}
+		"/proj/blob/main/item/a.txt", "/proj/commit/v1.patch", "/proj/commit/v1.diff", "/proj/archive/v1.tar.gz", "/proj/log.atom"}
 	etags := map[string]string{}
 	for _, u := range urls {
 		w := request(u, "")
@@ -72,12 +72,12 @@ func TestPagesAnswerNotModified(t *testing.T) {
 	}
 
 	// A new commit changes the pages and the branch's raw file, but not a
-	// tag's patch or tarball.
+	// tag's patch, diff or tarball.
 	os.WriteFile(filepath.Join(work, "a.txt"), []byte("two\n"), 0o644)
 	run("commit", "-qam", "two")
 	for _, u := range urls {
 		want := 200
-		if u == "/proj/commit/v1.patch" || u == "/proj/archive/v1.tar.gz" {
+		if u == "/proj/commit/v1.patch" || u == "/proj/commit/v1.diff" || u == "/proj/archive/v1.tar.gz" {
 			want = 304
 		}
 		if w := request(u, etags[u]); w.Code != want {

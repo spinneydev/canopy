@@ -10,9 +10,9 @@ issues or pull requests.
 
 - **Browse:** an index of every repository (grouped by folder), summaries
   with the README and the license, trees with syntax highlighting, rendered markdown, raw
-  files, blame, history, commits with diffs and `.patch` downloads, refs,
-  tags with their release notes, and tarballs. Links can select lines of
-  a file.
+  files, blame, history, commits with diffs and `.diff` and `.patch`
+  downloads, refs, tags with their release notes, and tarballs. Links can
+  select lines of a file.
 - **Clone** anything over HTTPS (`git clone https://git.example.com/NAME`).
   Pushing over HTTP is never possible.
 - **Push** over SSH to a locked-down `git` account. Pushing to a name that
@@ -128,7 +128,7 @@ slashes.
     /{repo}/blob/{ref}/item/{path}       raw file
     /{repo}/blame/{ref}/item/{path}      blame
     /{repo}/log/{ref}/item/{path}        history, paginated
-    /{repo}/commit/{hash}                commit with diff (.patch for a mailbox patch)
+    /{repo}/commit/{hash}                commit with diff (.diff for a plain diff, .patch for a mailbox patch)
     /{repo}/refs                         branches and tags (tags paginated)
     /{repo}/tag/{name}                   a tag: its message (release notes), signature, commit and tarball
     /{repo}/log.atom                     Atom feed of the newest commits
@@ -140,8 +140,8 @@ clicking a line number selects it, and clicking another extends the
 selection to there.
 
 Pages carry an ETag, so a browser or feed reader asking again gets a short
-"not modified" until something is pushed. Raw files, patches and tarballs
-stay cached until what they hold changes.
+"not modified" until something is pushed. Raw files, diffs, patches and
+tarballs stay cached until what they hold changes.
 
 `git clone https://host/{repo}` uses git's smart HTTP protocol, fetch only.
 
