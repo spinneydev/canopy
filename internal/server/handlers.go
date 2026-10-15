@@ -651,10 +651,14 @@ func (s *Server) tag(w http.ResponseWriter, r *http.Request, repo *Repo, name st
 }
 
 func (s *Server) archive(w http.ResponseWriter, r *http.Request, repo *Repo, name string) {
+	format, ctype := "tar.gz", "application/gzip"
 	ref, ok := strings.CutSuffix(name, ".tar.gz")
 	if !ok {
-		s.notFound(w, r)
-		return
+		if ref, ok = strings.CutSuffix(name, ".zip"); !ok {
+			s.notFound(w, r)
+			return
+		}
+		format, ctype = "zip", "application/zip"
 	}
 	hash, err := repo.ResolveCommit(r.Context(), ref)
 	if err != nil {
@@ -667,7 +671,7 @@ func (s *Server) archive(w http.ResponseWriter, r *http.Request, repo *Repo, nam
 		return
 	}
 	prefix := repo.Base() + "-" + strings.ReplaceAll(strings.TrimPrefix(ref, "v"), "/", "-")
-	w.Header().Set("Content-Type", "application/gzip")
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": prefix + ".tar.gz"}))
-	repo.WriteArchive(r.Context(), w, hash, prefix)
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": prefix + "." + format}))
+	repo.WriteArchive(r.Context(), w, hash, prefix, format)
 }

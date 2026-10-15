@@ -106,8 +106,10 @@ func TestRepoConfigCannotRunCommands(t *testing.T) {
 	if err := r.WritePatch(ctx, io.Discard, hash); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.WriteArchive(ctx, io.Discard, hash, "repo"); err != nil {
-		t.Fatal(err)
+	for _, format := range []string{"tar.gz", "zip"} {
+		if err := r.WriteArchive(ctx, io.Discard, hash, "repo", format); err != nil {
+			t.Fatal(err)
+		}
 	}
 	first := c.FirstParent()
 	if err := r.WriteDiff(ctx, io.Discard, first, hash); err != nil {

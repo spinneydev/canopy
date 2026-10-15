@@ -30,7 +30,7 @@
       <dd><a href="{{.Repo.ItemURL "tree" .Ref ""}}">browse</a> <a href="{{.Repo.ItemURL "log" .Ref ""}}">log</a></dd>
       {{with .LatestTag}}
       <dt><a href="{{$.Repo.URL "tag" .Name}}">{{.Name}}</a></dt>
-      <dd><a href="{{$.Repo.ItemURL "tree" .Name ""}}">browse</a>{{if not $.Repo.Upstream}} <a href="{{$.Repo.URL "archive" (printf "%s.tar.gz" .Name)}}">.tar.gz</a>{{end}}</dd>
+      <dd><a href="{{$.Repo.ItemURL "tree" .Name ""}}">browse</a>{{template "archives" dict "Repo" $.Repo "Ref" .Name}}</dd>
       {{end}}
     </dl>
     <h3>feeds</h3>

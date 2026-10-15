@@ -112,9 +112,9 @@ git -C /tmp/mirror-test/BurntSushi/toml.git update-ref refs/heads/master refs/he
 go run . -config mirror-test.toml -mirror
 ```
 
-A mirror shows "mirror of" on its summary page, has no `.tar.gz` links,
-and refuses `git clone` and downloads with a 403. Its folder (`BurntSushi`)
-is its owner on the index.
+A mirror shows "mirror of" on its summary page, has no `.tar.gz` or
+`.zip` links, and refuses `git clone` and downloads with a 403. Its folder
+(`BurntSushi`) is its owner on the index.
 
 Each `-mirror` run records its result, and the summary page shows it
 under "mirror of": "synced just now", or in red with the error. To see a

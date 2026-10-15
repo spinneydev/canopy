@@ -11,8 +11,8 @@ issues or pull requests.
 - **Browse:** an index of every repository (grouped by folder), summaries
   with the README and the license, trees with syntax highlighting, rendered markdown, raw
   files, blame, history, commits with diffs and `.diff` and `.patch`
-  downloads, refs, tags with their release notes, and tarballs. Links can
-  select lines of a file.
+  downloads, refs, tags with their release notes, and tarballs and zips.
+  Links can select lines of a file.
 - **Clone** anything over HTTPS (`git clone https://git.example.com/NAME`).
   Pushing over HTTP is never possible.
 - **Push** over SSH to a locked-down `git` account. Pushing to a name that
@@ -133,7 +133,7 @@ slashes.
     /{repo}/tag/{name}                   a tag: its message (release notes), signature, commit and tarball
     /{repo}/log.atom                     Atom feed of the newest commits
     /{repo}/tags.atom                    Atom feed of the newest tags
-    /{repo}/archive/{ref}.tar.gz         tarball
+    /{repo}/archive/{ref}.tar.gz         tarball (.zip for a zip)
 
 On tree and blame pages, `?lines=12` or `?lines=12-20` highlights lines;
 clicking a line number selects it, and clicking another extends the
@@ -141,7 +141,7 @@ selection to there.
 
 Pages carry an ETag, so a browser or feed reader asking again gets a short
 "not modified" until something is pushed. Raw files, diffs, patches and
-tarballs stay cached until what they hold changes.
+archives stay cached until what they hold changes.
 
 `git clone https://host/{repo}` uses git's smart HTTP protocol, fetch only.
 

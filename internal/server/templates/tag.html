@@ -19,7 +19,7 @@
   <dt>commit</dt>
   <dd class="mono"><a href="{{$.Repo.URL "commit" .Hash}}">{{.Hash}}</a></dd>
   <dt>tree</dt>
-  <dd><a href="{{$.Repo.ItemURL "tree" $.Tag.Name ""}}">browse</a> <a href="{{$.Repo.ItemURL "log" $.Tag.Name ""}}">log</a>{{if not $.Repo.Upstream}} <a href="{{$.Repo.URL "archive" (printf "%s.tar.gz" $.Tag.Name)}}">.tar.gz</a>{{end}}</dd>
+  <dd><a href="{{$.Repo.ItemURL "tree" $.Tag.Name ""}}">browse</a> <a href="{{$.Repo.ItemURL "log" $.Tag.Name ""}}">log</a>{{template "archives" dict "Repo" $.Repo "Ref" $.Tag.Name}}</dd>
   {{end}}
 </dl>
 {{with .C}}

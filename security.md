@@ -136,7 +136,7 @@ Anubis doesn't check git clients, so canopy limits work on its own
 | Limit | Value |
 |---|---|
 | Concurrent page requests | `max(8, 4 × CPUs)`; a request waits at most 10 s for a slot, then gets 503 |
-| Concurrent downloads (clones, tarballs) | `max(4, CPUs)`, a separate pool with the same 10 s wait, so downloads can never starve page views |
+| Concurrent downloads (clones, tarballs, zips) | `max(4, CPUs)`, a separate pool with the same 10 s wait, so downloads can never starve page views |
 | Time per page | 30 s |
 | Time per download | 10 min |
 | A download that stops moving | dropped after 20 s without progress |

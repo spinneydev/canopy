@@ -35,6 +35,10 @@
 
 {{define "crumbs"}}<span class="crumbs"><a href="{{.Repo.ItemURL "tree" .Ref ""}}">{{.Repo.Base}}</a>{{range .Crumbs}}<span class="slash">/</span><a href="{{$.Repo.ItemURL "tree" $.Ref .Path}}">{{.Name}}</a>{{end}}</span>{{end}}
 
+{{/* The download links of a ref, each after a space; mirrors are
+     downloaded from where they come from. Takes Repo and Ref. */}}
+{{define "archives"}}{{if not .Repo.Upstream}} <a href="{{.Repo.URL "archive" (printf "%s.tar.gz" .Ref)}}">.tar.gz</a> <a href="{{.Repo.URL "archive" (printf "%s.zip" .Ref)}}">.zip</a>{{end}}{{end}}
+
 {{define "refchip"}}<span class="ref-chip" title="viewing {{.}}">{{.}}</span>{{end}}
 
 {{define "sitelink"}}<a class="site" href="/">{{.Header}}</a>{{end}}

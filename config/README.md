@@ -252,7 +252,7 @@ fetch whatever is new. Only branches and tags are copied.
 
 Put a mirror in a folder named after its owner, as above, and the index
 shows that owner. Mirrors can be browsed but not cloned over HTTP or
-downloaded as `.tar.gz`: both are refused with a message naming the
+downloaded as `.tar.gz` or `.zip`: both are refused with a message naming the
 upstream URL, which the summary page shows as "mirror of" instead of a
 clone address. Below it is the last successful update ("synced 12 minutes
 ago"), in red with the error when the last one failed, or when there has

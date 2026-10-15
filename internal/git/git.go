@@ -430,13 +430,15 @@ func (r *Repo) WriteBlob(ctx context.Context, w io.Writer, hash, path string) er
 	return cmd.Run()
 }
 
-// WriteArchive streams a gzipped tarball of hash to w.
+// WriteArchive streams an archive of hash to w: a gzipped tarball for
+// format "tar.gz", or "zip".
 //
 // git archive runs two kinds of programs named in a repository's config: the
 // compressor (tar.<format>.command) and the smudge filters selected by
-// .gitattributes. Compression happens here instead, and every filter driver
-// the repository defines is switched off for the run.
-func (r *Repo) WriteArchive(ctx context.Context, w io.Writer, hash, prefix string) error {
+// .gitattributes. Compression happens here instead (git zips by itself),
+// and every filter driver the repository defines is switched off for the
+// run.
+func (r *Repo) WriteArchive(ctx context.Context, w io.Writer, hash, prefix, format string) error {
 	var disable []string
 	out, err := r.run(ctx, "config", "--name-only", "--get-regexp", `^filter\..*\.(smudge|process|clean|required)$`)
 	if err == nil {
@@ -450,6 +452,11 @@ func (r *Repo) WriteArchive(ctx context.Context, w io.Writer, hash, prefix strin
 				disable = append(disable, driver+".smudge=", driver+".process=", driver+".required=false")
 			}
 		}
+	}
+	if format == "zip" {
+		cmd := r.cmdWithConfig(ctx, disable, "archive", "--format=zip", "--prefix="+prefix+"/", hash)
+		cmd.Stdout = w
+		return cmd.Run()
 	}
 	zw := gzip.NewWriter(w)
 	cmd := r.cmdWithConfig(ctx, disable, "archive", "--format=tar", "--prefix="+prefix+"/", hash)
