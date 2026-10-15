@@ -203,6 +203,42 @@ func TestResolveCommitRefusesSpecialRevisions(t *testing.T) {
 	}
 }
 
+func TestResolveCommitRefusesUnreachableCommits(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	work := t.TempDir()
+	gitIn(t, work, "", "init", "-q", "-b", "main")
+	gitIn(t, work, "", "commit", "-q", "--allow-empty", "-m", "one")
+	gitIn(t, work, "", "commit", "-q", "--allow-empty", "-m", "two")
+	two := gitIn(t, work, "", "rev-parse", "HEAD")
+	// A commit pushed over: the branch moved back past it.
+	gitIn(t, work, "", "commit", "-q", "--allow-empty", "-m", "secret")
+	gone := gitIn(t, work, "", "rev-parse", "HEAD")
+	gitIn(t, work, "", "reset", "-q", "--hard", "HEAD~1")
+	// A commit only a tag holds, and one held by a ref outside branches and tags.
+	gitIn(t, work, "", "checkout", "-q", "--detach")
+	gitIn(t, work, "", "commit", "-q", "--allow-empty", "-m", "released")
+	gitIn(t, work, "", "tag", "-a", "-m", "release", "v1")
+	gitIn(t, work, "", "commit", "-q", "--allow-empty", "-m", "elsewhere")
+	gitIn(t, work, "", "update-ref", "refs/remotes/origin/x", "HEAD")
+	elsewhere := gitIn(t, work, "", "rev-parse", "HEAD")
+	gitIn(t, work, "", "checkout", "-q", "main")
+
+	ctx := context.Background()
+	r := &Repo{Dir: filepath.Join(work, ".git")}
+	for _, rev := range []string{"main", "main~1", two, two[:7], "v1", "v1~1"} {
+		if _, err := r.ResolveCommit(ctx, rev); err != nil {
+			t.Errorf("ResolveCommit(%q) = %v, want a commit", rev, err)
+		}
+	}
+	for _, rev := range []string{gone, gone[:4], gone + "~0", elsewhere, "origin/x", "refs/remotes/origin/x"} {
+		if hash, err := r.ResolveCommit(ctx, rev); err != ErrNotFound {
+			t.Errorf("ResolveCommit(%q) = %q, %v, want ErrNotFound", rev, hash, err)
+		}
+	}
+}
+
 func TestTag(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")

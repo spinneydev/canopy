@@ -129,8 +129,11 @@ func IsRepo(dir string) bool {
 }
 
 // ResolveCommit turns a user-supplied revision into a full commit hash.
-// Options, reflog lookups (main@{1}, which can reach commits no branch points
-// to any more) and commit-message searches (:/text, main^{/text}) are refused.
+// Options, reflog lookups (main@{1}) and commit-message searches (:/text,
+// main^{/text}) are refused, and so is any commit no branch or tag holds:
+// one pushed over or left by a deleted branch stays in the repository until
+// git gc removes it, and its hash, or the first few characters of it, would
+// otherwise still show it.
 func (r *Repo) ResolveCommit(ctx context.Context, rev string) (string, error) {
 	if rev == "" || strings.HasPrefix(rev, "-") || strings.HasPrefix(rev, ":") ||
 		strings.Contains(rev, "@{") || strings.Contains(rev, "{/") || strings.ContainsAny(rev, "\x00\n") {
@@ -140,7 +143,15 @@ func (r *Repo) ResolveCommit(ctx context.Context, rev string) (string, error) {
 	if err != nil {
 		return "", ErrNotFound
 	}
-	return strings.TrimSpace(string(out)), nil
+	hash := strings.TrimSpace(string(out))
+	// Commits the branches and tags don't hold: none for a reachable one.
+	// The walk stops where hash joins their history, so a branch tip or a
+	// recent commit costs next to nothing.
+	out, err = r.run(ctx, "rev-list", "-n", "1", hash, "--not", "--branches", "--tags", "--")
+	if err != nil || len(bytes.TrimSpace(out)) > 0 {
+		return "", ErrNotFound
+	}
+	return hash, nil
 }
 
 // DefaultBranch returns the branch HEAD points to, even if it has no commits.

@@ -101,7 +101,10 @@ command that changes a repository, and it has no accounts or sessions.
   commit goes through `ResolveCommit`, which refuses a leading `-` or `:`
   (option and path injection), `@{` (reflog), `{/` (searching commit
   messages, which can be slow), NUL and newlines, and turns the rest into a
-  full commit hash that is used from then on.
+  full commit hash that is used from then on. That commit must be on a
+  branch or a tag: one that was force-pushed over, or left by a deleted
+  branch, stays in the repository until `git gc` removes it, but no page,
+  file or archive shows it, by its full hash or a short one.
 - **Paths stay inside the repository.** File paths are passed to git as
   tree paths of a resolved commit, never as file system paths.
 - **A repository's config can't run programs.** canopy reads repositories
