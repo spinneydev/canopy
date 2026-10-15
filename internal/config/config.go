@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -180,6 +181,15 @@ func checkMirror(name, url string, depth int) error {
 	}
 	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "git://") {
 		return fmt.Errorf("mirrors: %s: %q must start with https://, http:// or git://", name, url)
+	}
+	// The summary page shows the URL, so a password or token in it would
+	// be on the web.
+	u, err := neturl.Parse(url)
+	if err != nil {
+		return fmt.Errorf("mirrors: %s: %q isn't a URL: %v", name, url, err)
+	}
+	if u.User != nil {
+		return fmt.Errorf("mirrors: %s: %q holds a user name or password, which its page would show; mirror a repository anyone can clone", name, u.Redacted())
 	}
 	return nil
 }

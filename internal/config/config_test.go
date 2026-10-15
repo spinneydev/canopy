@@ -141,6 +141,10 @@ func TestMirrorsAreChecked(t *testing.T) {
 		`"a/b/c/d" = "https://x/y.git"`:      "more than depth",
 		`"a/b" = "ext::sh -c touch% /tmp/x"`: "must start with",
 		`"a/b" = "file:///etc"`:              "must start with",
+		`"a/b" = "https://me:tok@x/y.git"`:   "holds a user name or password",
+		`"a/b" = "https://tok@x/y.git"`:      "holds a user name or password",
+		`"a/b" = "git://me@x/y.git"`:         "holds a user name or password",
+		`"a/b" = "https://x/%zz@y.git"`:      "isn't a URL",
 	} {
 		_, err := Load(writeConfig(t, dir, "[mirrors]\n"+entry+"\n"))
 		if err == nil || !strings.Contains(err.Error(), want) {

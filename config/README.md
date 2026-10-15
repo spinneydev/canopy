@@ -256,7 +256,8 @@ downloaded as `.tar.gz` or `.zip`: both are refused with a message naming the
 upstream URL, which the summary page shows as "mirror of" instead of a
 clone address. Below it is the last successful update ("synced 12 minutes
 ago"), in red with the error when the last one failed, or when there has
-been none for two hours. URLs must start with `https://`, `http://` or `git://`.
+been none for two hours. URLs must start with `https://`, `http://` or `git://`,
+and can't hold a user name, password or token: the summary page shows them.
 The first clone runs in the background after a deploy; follow it with
 `journalctl -u canopy-mirror -f`, or run it by hand with
 `canopy -config canopy.toml -mirror`. Removing a line stops updating that
