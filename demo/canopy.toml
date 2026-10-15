@@ -42,7 +42,7 @@ act-4 = "#ff79c6"
 # Signature badges: robin's commits and release tags show as verified.
 # Kim signs with a key not listed here, which shows as signed only.
 [signatures.keys]
-robin = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDV3BJFaJEgemWr6ImnBnaWn3YcyBhItxiNVOMDaFlmO robin@example"]
+robin = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILLbXp6GV66ekOOVKNoJ0wxGFdrSc58W6+O4QF3VaUbN robin@example"]
 
 [repos.tinyhttpd]
 homepage = "https://example.com/tinyhttpd/"
