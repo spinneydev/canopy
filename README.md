@@ -156,7 +156,7 @@ Development: `go test ./...`, `go vet ./...`, `gofmt -l .` and
 
 ## License
 
-Copyright (C) 2026 Canopy Development Team
+Copyright (C) 2026 The spinney authors
 
 canopy is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free
