@@ -252,6 +252,28 @@ func (r *Repo) Diverged(ctx context.Context, base, head string) (Divergence, err
 	return d, nil
 }
 
+// BranchesDiverged counts how far each branch has moved from the commit
+// base, by branch name, in one walk. It needs git 2.41 or later (for
+// for-each-ref's ahead-behind); older ones fail.
+func (r *Repo) BranchesDiverged(ctx context.Context, base string) (map[string]*Divergence, error) {
+	out, err := r.run(ctx, "for-each-ref", "--format=%(refname)%1f%(ahead-behind:"+base+")", "refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string]*Divergence{}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		name, nums, ok := strings.Cut(line, "\x1f")
+		if !ok {
+			continue
+		}
+		var d Divergence
+		if _, err := fmt.Sscan(nums, &d.Ahead, &d.Behind); err == nil {
+			counts[strings.TrimPrefix(name, "refs/heads/")] = &d
+		}
+	}
+	return counts, nil
+}
+
 // Since returns up to n commits on any branch committed after since (all of
 // them for a zero time), newest first, each once even when several branches
 // hold it.

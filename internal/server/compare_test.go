@@ -26,6 +26,8 @@ func TestCompare(t *testing.T) {
 		{"/proj/compare", `name="from" value="v2"`},
 		{"/proj/compare/v1...v2.diff", "-one\n+two"},
 		{"/proj/compare/v1...v2.patch", "Subject: [PATCH] two"},
+		{"/proj/refs", "1 ahead, 1 behind main"},
+		{"/proj/refs", `href="/proj/compare/main...side" rel="nofollow">compare</a>`},
 		{"/proj/refs", `href="/proj/compare/v1...v2" rel="nofollow" title="since v1">changes</a>`},
 		{"/proj/tag/v2", `since v1</a>`},
 	} {

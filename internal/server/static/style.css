@@ -203,6 +203,7 @@ main { min-height: 60vh; }
 .event .links a { margin-right: .75rem; }
 .repo-item p { margin: .1rem 0; }
 .branch-head { margin: .2rem 0 0; font-size: .9rem; word-break: break-word; }
+.branch-diverged { margin: .1rem 0 0; font-size: .9rem; }
 
 .ref-label {
   display: inline-block;

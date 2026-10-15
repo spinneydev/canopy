@@ -11,8 +11,9 @@ issues or pull requests.
 - **Browse:** an index of every repository (grouped by folder), summaries
   with the README and the license, trees with syntax highlighting, rendered markdown, raw
   files, blame, history, commits with diffs and `.diff` and `.patch`
-  downloads, comparisons between any two refs, refs, tags with their
-  release notes, and tarballs and zips. Links can select lines of a file.
+  downloads, comparisons between any two refs, refs with how far each
+  branch is from the default one, tags with their release notes, and
+  tarballs and zips. Links can select lines of a file.
 - **Clone** anything over HTTPS (`git clone https://git.example.com/NAME`).
   Pushing over HTTP is never possible.
 - **Push** over SSH to a locked-down `git` account. Pushing to a name that
@@ -131,7 +132,7 @@ slashes.
     /{repo}/commit/{hash}                commit with diff (.diff for a plain diff, .patch for a mailbox patch)
     /{repo}/compare/{from}...{to}        the commits {to} has that {from} lacks, and their changes (.diff, .patch)
     /{repo}/compare                      a form for picking two refs to compare
-    /{repo}/refs                         branches and tags (tags paginated)
+    /{repo}/refs                         branches, each with how far it is from the default branch, and tags (paginated)
     /{repo}/tag/{name}                   a tag: its message (release notes), signature, commit, archives and the changes since the tag before
     /{repo}/log.atom                     Atom feed of the newest commits
     /{repo}/tags.atom                    Atom feed of the newest tags
@@ -144,6 +145,10 @@ selection to there.
 Pages carry an ETag, so a browser or feed reader asking again gets a short
 "not modified" until something is pushed. Raw files, diffs, patches and
 archives stay cached until what they hold changes.
+
+How far each branch is from the default one ("2 ahead, 5 behind main")
+needs git 2.41 or later on the server; with an older git the refs page
+leaves the counts out.
 
 `git clone https://host/{repo}` uses git's smart HTTP protocol, fetch only.
 

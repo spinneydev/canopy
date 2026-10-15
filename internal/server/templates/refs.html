@@ -33,16 +33,18 @@
   </div>
   <div class="col-side">
     <h3>branches</h3>
-    {{range .Branches}}
+    {{range $b := .Branches}}
     <div class="event">
       <h4>
         <a href="{{$.Repo.ItemURL "tree" .Name ""}}">{{.Name}}</a>
         {{if eq .Name $.Default}}<span class="ref-label branch">default</span>{{end}}
       </h4>
       <p class="branch-head"><a class="hash" href="{{$.Repo.URL "commit" .Commit}}">{{short .Commit}}</a> {{.Subject}} <small class="muted"><time title="{{date .When}}">{{ago .When}}</time></small></p>
+      {{if ne .Name $.Default}}{{with index $.Diverged .Name}}<p class="branch-diverged muted">{{if or .Ahead .Behind}}{{.Ahead}} ahead, {{.Behind}} behind{{else}}even with{{end}} {{$.Default}}</p>{{end}}{{end}}
       <div class="links">
         <a href="{{$.Repo.ItemURL "tree" .Name ""}}">browse</a>
         <a href="{{$.Repo.ItemURL "log" .Name ""}}">log</a>
+        {{if and $.HasDefault (ne .Name $.Default)}}<a href="{{$.Repo.URL "compare" (printf "%s...%s" $.Default $b.Name)}}" rel="nofollow">compare</a>{{end}}
         {{- template "archives" dict "Repo" $.Repo "Ref" .Name}}
       </div>
     </div>

@@ -127,6 +127,9 @@ func TestRepoConfigCannotRunCommands(t *testing.T) {
 	if d, err := r.Diverged(ctx, first, hash); err != nil || d != (Divergence{Ahead: 1}) {
 		t.Fatalf("Diverged = %+v, %v; want 1 ahead", d, err)
 	}
+	if d, err := r.BranchesDiverged(ctx, first); err != nil || d["main"] == nil || *d["main"] != (Divergence{Ahead: 1}) {
+		t.Fatalf("BranchesDiverged = %v, %v; want main 1 ahead", d, err)
+	}
 	if _, err := r.Refs(ctx, "refs/heads"); err != nil {
 		t.Fatal(err)
 	}

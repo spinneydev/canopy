@@ -624,12 +624,34 @@ func (s *Server) refs(w http.ResponseWriter, r *http.Request, repo *Repo) {
 			previous[t.Name] = tags[start+i+1].Name
 		}
 	}
-	s.render(w, r, http.StatusOK, "refs", map[string]any{
+	def := repo.DefaultBranch(ctx)
+	data := map[string]any{
 		"Title": repo.Name + ": refs", "Repo": repo, "Tab": "refs",
-		"Branches": branches, "Default": repo.DefaultBranch(ctx),
+		"Branches": branches, "Default": def,
 		"Tags": shown, "TagCount": len(tags), "Page": page, "Pages": pages,
 		"Previous": previous, "Sigs": s.signatures(ctx, repo, signed),
-	})
+	}
+	var diverged map[string]*git.Divergence
+	if hash, err := repo.ResolveCommit(ctx, def); err == nil {
+		data["HasDefault"] = true
+		diverged = s.diverged(ctx, repo, hash)
+	}
+	data["Diverged"] = diverged
+	s.render(w, r, http.StatusOK, "refs", data)
+}
+
+// divergedTimeout bounds counting how far each branch is from the default
+// one; the refs page leaves the counts out when it runs over.
+const divergedTimeout = 3 * time.Second
+
+func (s *Server) diverged(ctx context.Context, repo *Repo, base string) map[string]*git.Divergence {
+	ctx, cancel := context.WithTimeout(ctx, divergedTimeout)
+	defer cancel()
+	counts, err := repo.BranchesDiverged(ctx, base)
+	if err != nil {
+		return nil // too slow, or a git before 2.41
+	}
+	return counts
 }
 
 func (s *Server) tag(w http.ResponseWriter, r *http.Request, repo *Repo, name string) {
