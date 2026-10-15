@@ -132,7 +132,7 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request, repo *Repo) {
 		s.render(w, r, http.StatusOK, "summary", data)
 		return
 	}
-	commits, err := repo.Log(ctx, hash, "", 3)
+	commits, err := repo.Log(ctx, hash, "", 0, 3)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -227,7 +227,7 @@ func (s *Server) tree(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p
 		"Title": repo.Name + ": " + orRoot(p), "Repo": repo, "Tab": "tree",
 		"Ref": ref, "Hash": hash, "Path": p, "Crumbs": crumbs(p),
 	}
-	if last, err := repo.Log(ctx, hash, p, 1); err == nil && len(last) > 0 {
+	if last, err := repo.Log(ctx, hash, p, 0, 1); err == nil && len(last) > 0 {
 		data["Last"] = last[0]
 	}
 	switch typ {
@@ -500,37 +500,48 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p 
 		s.fail(w, r, err)
 		return
 	}
-	start := hash
-	if from := r.URL.Query().Get("from"); from != "" {
-		if start, err = repo.ResolveCommit(ctx, from); err != nil {
+	// Later pages hold on to the commit the first started from (?from), so
+	// a push in between doesn't move them, and leave out the commits the
+	// pages before showed (?skip).
+	q := r.URL.Query()
+	tip := hash
+	if from := q.Get("from"); from != "" {
+		if tip, err = repo.ResolveCommit(ctx, from); err != nil {
 			s.fail(w, r, err)
 			return
 		}
 	}
-	commits, err := repo.Log(ctx, start, p, logPageSize+1)
+	skip := 0
+	if v := q.Get("skip"); v != "" {
+		if skip, err = strconv.Atoi(v); err != nil || skip < 0 {
+			s.notFound(w, r)
+			return
+		}
+	}
+	commits, err := repo.Log(ctx, tip, p, skip, logPageSize+1)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	next := ""
-	if len(commits) > logPageSize {
-		next = commits[logPageSize].Hash
-		commits = commits[:logPageSize]
+	data := map[string]any{
+		"Repo": repo, "Tab": "log", "Ref": ref, "Path": p, "Crumbs": crumbs(p),
+		"Labels": s.labels(r, repo), "Paged": tip != hash || skip > 0,
 	}
-	title := repo.Name + ": log"
+	if len(commits) > logPageSize {
+		commits = commits[:logPageSize]
+		next := url.Values{"from": {tip}, "skip": {strconv.Itoa(skip + logPageSize)}}
+		data["Next"] = repo.ItemURL("log", ref, p) + "?" + next.Encode()
+	}
+	data["Title"] = repo.Name + ": log"
 	if p != "" {
-		title += " " + p
+		data["Title"] = repo.Name + ": log " + p
 	}
 	hashes := make([]string, len(commits))
 	for i, c := range commits {
 		hashes[i] = c.Hash
 	}
-	s.render(w, r, http.StatusOK, "log", map[string]any{
-		"Title": title, "Repo": repo, "Tab": "log", "Ref": ref, "Path": p,
-		"Crumbs": crumbs(p), "Commits": commits, "Next": next,
-		"Labels": s.labels(r, repo), "Paged": start != hash,
-		"Sigs": s.signatures(ctx, repo, hashes),
-	})
+	data["Commits"], data["Sigs"] = commits, s.signatures(ctx, repo, hashes)
+	s.render(w, r, http.StatusOK, "log", data)
 }
 
 // cutRaw splits off name's ".diff" or ".patch", which ask for a commit or a
@@ -757,7 +768,7 @@ func (s *Server) compare(w http.ResponseWriter, r *http.Request, repo *Repo, spe
 			s.fail(w, r, err)
 			return
 		}
-		commits, err := repo.Log(ctx, from+".."+to, "", compareCommits)
+		commits, err := repo.Log(ctx, from+".."+to, "", 0, compareCommits)
 		if err != nil {
 			s.fail(w, r, err)
 			return

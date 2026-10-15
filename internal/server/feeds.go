@@ -62,7 +62,7 @@ func (s *Server) feed(w http.ResponseWriter, r *http.Request, repo *Repo, kind s
 		ref, hash, err := s.resolve(ctx, repo, "")
 		f.Title = repo.Name + ": commits on " + ref
 		if err == nil { // an empty repository has an empty feed
-			commits, err := repo.Log(ctx, hash, "", feedSize)
+			commits, err := repo.Log(ctx, hash, "", 0, feedSize)
 			if err != nil {
 				s.fail(w, r, err)
 				return

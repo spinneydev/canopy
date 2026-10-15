@@ -204,11 +204,11 @@ func unix(s string) time.Time {
 	return time.Unix(n, 0)
 }
 
-// Log returns up to n commits reachable from rev, optionally limited to
-// those touching path. rev is a commit hash, or two joined by ".." for the
-// commits the second has that the first lacks.
-func (r *Repo) Log(ctx context.Context, rev, path string, n int) ([]*Commit, error) {
-	args := []string{"log", commitFormat, "-n", strconv.Itoa(n), rev, "--"}
+// Log returns up to n commits reachable from rev, after the first skip of
+// them, optionally limited to those touching path. rev is a commit hash, or
+// two joined by ".." for the commits the second has that the first lacks.
+func (r *Repo) Log(ctx context.Context, rev, path string, skip, n int) ([]*Commit, error) {
+	args := []string{"log", commitFormat, "--skip=" + strconv.Itoa(skip), "-n", strconv.Itoa(n), rev, "--"}
 	if path != "" {
 		args = append(args, path)
 	}

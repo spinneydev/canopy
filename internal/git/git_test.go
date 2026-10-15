@@ -82,10 +82,10 @@ func TestRepoConfigCannotRunCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.Log(ctx, hash, "", 10); err != nil {
+	if _, err := r.Log(ctx, hash, "", 0, 10); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.Log(ctx, hash, "a.c", 10); err != nil {
+	if _, err := r.Log(ctx, hash, "a.c", 0, 10); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.Diff(ctx, c); err != nil {
