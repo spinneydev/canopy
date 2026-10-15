@@ -198,6 +198,7 @@ main { min-height: 60vh; }
   word-break: break-word;
 }
 .event .links { margin-top: .35rem; font-size: .9rem; }
+.tag-name { margin: 0; font-family: var(--mono); }
 .event .links a { margin-right: .75rem; }
 .repo-item p { margin: .1rem 0; }
 .branch-head { margin: .2rem 0 0; font-size: .9rem; word-break: break-word; }

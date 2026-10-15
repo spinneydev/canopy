@@ -178,3 +178,31 @@ func TestResolveCommitRefusesSpecialRevisions(t *testing.T) {
 		}
 	}
 }
+
+func TestTag(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	work := t.TempDir()
+	gitIn(t, work, "", "init", "-q", "-b", "main")
+	gitIn(t, work, "", "commit", "-q", "--allow-empty", "-m", "one")
+	gitIn(t, work, "", "tag", "-a", "-m", "release one", "v1")
+	gitIn(t, work, "", "tag", "v1.1")
+	gitIn(t, work, "", "tag", "rel/a")
+
+	ctx := context.Background()
+	r := &Repo{Dir: filepath.Join(work, ".git")}
+	tag, err := r.Tag(ctx, "v1")
+	if err != nil || !tag.Annotated || tag.Tagger != "t" || tag.Message != "release one" {
+		t.Errorf("Tag(v1) = %+v, %v", tag, err)
+	}
+	if tag, err := r.Tag(ctx, "rel/a"); err != nil || tag.Annotated || tag.Name != "rel/a" {
+		t.Errorf("Tag(rel/a) = %+v, %v", tag, err)
+	}
+	// A pattern or a folder of tags names no tag.
+	for _, name := range []string{"", "v*", "rel", "v", "nope"} {
+		if _, err := r.Tag(ctx, name); err != ErrNotFound {
+			t.Errorf("Tag(%q) = %v, want ErrNotFound", name, err)
+		}
+	}
+}

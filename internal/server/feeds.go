@@ -88,8 +88,11 @@ func (s *Server) feed(w http.ResponseWriter, r *http.Request, repo *Repo, kind s
 		}
 		f.Title = repo.Name + ": tags"
 		for _, t := range tags[:min(feedSize, len(tags))] {
-			link := base + repo.ItemURL("tree", t.Name, "")
-			e := atomEntry{Title: t.Name, ID: link, Updated: atomTime(t.When), Link: atomLink{Href: link}, Content: atomContent{Type: "text"}}
+			// The ID is the tag's old link, so readers don't list every
+			// tag again as new.
+			id := base + repo.ItemURL("tree", t.Name, "")
+			link := base + repo.URL("tag", t.Name)
+			e := atomEntry{Title: t.Name, ID: id, Updated: atomTime(t.When), Link: atomLink{Href: link}, Content: atomContent{Type: "text"}}
 			if t.Annotated {
 				e.Content.Text = t.Message
 			}

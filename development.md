@@ -158,6 +158,9 @@ GB and a long time to clone.
 - **Feeds**: `/tinyhttpd/log.atom` and `/tinyhttpd/tags.atom` are valid
   Atom with absolute links, and a feed reader finds them from the
   repository's page.
+- **Tags**: `/tinyhttpd/tag/v0.2.0` shows the release notes, tagger,
+  signature and commit; tag names on the refs, summary and log pages link
+  there.
 
 ## Tests and checks
 

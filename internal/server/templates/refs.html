@@ -7,7 +7,7 @@
     {{range .Tags}}
     <div class="event">
       <h4>
-        <a href="{{$.Repo.ItemURL "tree" .Name ""}}">{{.Name}}</a>
+        <a href="{{$.Repo.URL "tag" .Name}}">{{.Name}}</a>
         <small class="muted"><time title="{{date .When}}">{{ago .When}}</time></small>
         {{if .Annotated}}{{template "sig" index $.Sigs .Hash}}{{end}}
       </h4>

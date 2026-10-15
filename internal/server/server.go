@@ -293,6 +293,8 @@ func (s *Server) serveRepo(w http.ResponseWriter, r *http.Request, repo *Repo, r
 		s.commit(w, r, repo, strings.Join(rest, "/"))
 	case "refs":
 		s.refs(w, r, repo)
+	case "tag":
+		s.tag(w, r, repo, strings.Join(rest, "/"))
 	case "log.atom", "tags.atom":
 		s.feed(w, r, repo, strings.TrimSuffix(action, ".atom"))
 	case "archive":

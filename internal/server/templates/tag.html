@@ -1,0 +1,29 @@
+{{define "header"}}{{template "repoheader" .}}{{end}}
+
+{{define "content"}}
+{{$sig := index .Sigs .Tag.Hash}}
+<div class="event">
+  <h3 class="tag-name">{{.Tag.Name}}{{if .Tag.Annotated}} {{template "sig" $sig}}{{end}}</h3>
+  {{if .Tag.Annotated}}{{with .Tag.Message}}<pre class="commit-msg">{{.}}</pre>{{end}}{{end}}
+</div>
+<dl class="kv commit-meta">
+  {{if .Tag.Annotated}}
+  <dt>tagger</dt>
+  <dd>{{.Tag.Tagger}} <span class="muted">{{date .Tag.When}}</span></dd>
+  {{with $sig.Label}}
+  <dt>signature</dt>
+  <dd>{{template "sig" $sig}} <span class="muted">{{$sig.Note}}</span></dd>
+  {{end}}
+  {{end}}
+  {{with .C}}
+  <dt>commit</dt>
+  <dd class="mono"><a href="{{$.Repo.URL "commit" .Hash}}">{{.Hash}}</a></dd>
+  <dt>tree</dt>
+  <dd><a href="{{$.Repo.ItemURL "tree" $.Tag.Name ""}}">browse</a> <a href="{{$.Repo.ItemURL "log" $.Tag.Name ""}}">log</a>{{if not $.Repo.Upstream}} <a href="{{$.Repo.URL "archive" (printf "%s.tar.gz" $.Tag.Name)}}">.tar.gz</a>{{end}}</dd>
+  {{end}}
+</dl>
+{{with .C}}
+<h3>commit</h3>
+{{template "event" dict "Repo" $.Repo "C" . "Labels" (index $.Labels .Hash) "Full" false}}
+{{end}}
+{{end}}

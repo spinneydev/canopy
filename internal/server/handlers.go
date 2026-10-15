@@ -101,7 +101,7 @@ func (s *Server) labels(r *http.Request, repo *Repo) map[string][]label {
 		for _, ref := range refs {
 			l := label{Name: ref.Name, Kind: "branch", URL: repo.URL("log", ref.Name)}
 			if kind == "tags" {
-				l.Kind, l.URL = "tag", repo.URL("tree", ref.Name)
+				l.Kind, l.URL = "tag", repo.URL("tag", ref.Name)
 			}
 			m[ref.Commit] = append(m[ref.Commit], l)
 		}
@@ -503,6 +503,31 @@ func (s *Server) refs(w http.ResponseWriter, r *http.Request, repo *Repo) {
 		"Tags": shown, "TagCount": len(tags), "Page": page, "Pages": pages,
 		"Sigs": s.signatures(ctx, repo, signed),
 	})
+}
+
+func (s *Server) tag(w http.ResponseWriter, r *http.Request, repo *Repo, name string) {
+	ctx := r.Context()
+	tag, err := repo.Tag(ctx, name)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	// Only annotated tags carry a signature of their own.
+	var signed []string
+	if tag.Annotated {
+		signed = []string{tag.Hash}
+	}
+	data := map[string]any{
+		"Title": repo.Name + ": " + tag.Name, "Repo": repo, "Tab": "refs",
+		"Tag": tag, "Labels": s.labels(r, repo), "Sigs": s.signatures(ctx, repo, signed),
+	}
+	// A tag can name a tree or a blob, which have no commit to show.
+	if hash, err := repo.ResolveCommit(ctx, tag.Hash); err == nil {
+		if c, err := repo.Commit(ctx, hash); err == nil {
+			data["C"] = c
+		}
+	}
+	s.render(w, r, http.StatusOK, "tag", data)
 }
 
 func (s *Server) archive(w http.ResponseWriter, r *http.Request, repo *Repo, name string) {

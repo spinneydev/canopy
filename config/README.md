@@ -112,7 +112,7 @@ tab is on, a repository named `activity` can't be reached at `/activity`.
 ### `[signatures]`
 
 Signature badges on commits (log and commit pages) and annotated tags (refs
-page), like GitHub's. Off until a key is listed.
+and tag pages), like GitHub's. Off until a key is listed.
 
 | key | default | meaning |
 |---|---|---|

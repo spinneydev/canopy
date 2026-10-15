@@ -462,23 +462,48 @@ type Ref struct {
 	Commit    string // the commit it ultimately points to
 	Annotated bool
 	When      time.Time
+	Tagger    string // who made an annotated tag
 	Subject   string
 	Message   string
 }
 
 // Refs lists refs under prefix (refs/heads or refs/tags), newest first.
 func (r *Repo) Refs(ctx context.Context, prefix string) ([]Ref, error) {
+	return r.refs(ctx, prefix, prefix)
+}
+
+// Tag returns the tag called name, or ErrNotFound.
+func (r *Repo) Tag(ctx context.Context, name string) (*Ref, error) {
+	if name == "" || strings.ContainsAny(name, "\x00\n") {
+		return nil, ErrNotFound
+	}
+	// The pattern also matches tags below name ("v1/rc"), and globs in it
+	// match others; only the exact name counts.
+	refs, err := r.refs(ctx, "refs/tags", "refs/tags/"+name)
+	if err != nil {
+		return nil, err
+	}
+	for _, ref := range refs {
+		if ref.Name == name {
+			return &ref, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+// refs lists the refs matching pattern, named relative to prefix.
+func (r *Repo) refs(ctx context.Context, prefix, pattern string) ([]Ref, error) {
 	out, err := r.run(ctx, "for-each-ref", "--sort=-version:refname", "--sort=-creatordate",
-		"--format=%(refname)%1f%(objectname)%1f%(objecttype)%1f%(*objectname)%1f%(creatordate:unix)%1f%(contents:subject)%1f%(contents)%1e",
-		prefix)
+		"--format=%(refname)%1f%(objectname)%1f%(objecttype)%1f%(*objectname)%1f%(creatordate:unix)%1f%(taggername)%1f%(contents:subject)%1f%(contents)%1e",
+		pattern)
 	if err != nil {
 		return nil, err
 	}
 	var refs []Ref
 	for _, rec := range strings.Split(string(out), "\x1e") {
 		rec = strings.TrimLeft(rec, "\n")
-		f := strings.SplitN(rec, "\x1f", 7)
-		if len(f) != 7 {
+		f := strings.SplitN(rec, "\x1f", 8)
+		if len(f) != 8 {
 			continue
 		}
 		ref := Ref{
@@ -486,8 +511,9 @@ func (r *Repo) Refs(ctx context.Context, prefix string) ([]Ref, error) {
 			Hash:    f[1],
 			Commit:  f[1],
 			When:    unix(f[4]),
-			Subject: f[5],
-			Message: stripSignature(f[6]),
+			Tagger:  f[5],
+			Subject: f[6],
+			Message: stripSignature(f[7]),
 		}
 		if f[2] == "tag" {
 			ref.Annotated = true
