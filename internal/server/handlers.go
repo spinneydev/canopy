@@ -2,12 +2,14 @@ package server
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"html/template"
 	"mime"
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,9 +20,10 @@ import (
 )
 
 const (
-	logPageSize  = 20
-	tagsPageSize = 20
-	maxBlobBytes = 2 << 20
+	logPageSize    = 20
+	tagsPageSize   = 20
+	compareCommits = 50
+	maxBlobBytes   = 2 << 20
 )
 
 // section groups repositories by the folder they live in, like cgit's
@@ -530,8 +533,8 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p 
 	})
 }
 
-// cutRaw splits off name's ".diff" or ".patch", which ask for a commit as
-// plain text.
+// cutRaw splits off name's ".diff" or ".patch", which ask for a commit or a
+// comparison as plain text.
 func cutRaw(name string) (rest, ext string) {
 	for _, ext := range []string{".diff", ".patch"} {
 		if rest, ok := strings.CutSuffix(name, ext); ok {
@@ -612,16 +615,20 @@ func (s *Server) refs(w http.ResponseWriter, r *http.Request, repo *Repo) {
 	shown := tags[start:min(start+tagsPageSize, len(tags))]
 	// Only annotated tags carry a signature of their own.
 	var signed []string
-	for _, t := range shown {
+	previous := map[string]string{}
+	for i, t := range shown {
 		if t.Annotated {
 			signed = append(signed, t.Hash)
+		}
+		if start+i+1 < len(tags) {
+			previous[t.Name] = tags[start+i+1].Name
 		}
 	}
 	s.render(w, r, http.StatusOK, "refs", map[string]any{
 		"Title": repo.Name + ": refs", "Repo": repo, "Tab": "refs",
 		"Branches": branches, "Default": repo.DefaultBranch(ctx),
 		"Tags": shown, "TagCount": len(tags), "Page": page, "Pages": pages,
-		"Sigs": s.signatures(ctx, repo, signed),
+		"Previous": previous, "Sigs": s.signatures(ctx, repo, signed),
 	})
 }
 
@@ -647,7 +654,105 @@ func (s *Server) tag(w http.ResponseWriter, r *http.Request, repo *Repo, name st
 			data["C"] = c
 		}
 	}
+	// What changed since the tag before it, as on the refs page.
+	tags, _ := repo.Refs(ctx, "refs/tags")
+	if i := slices.IndexFunc(tags, func(t git.Ref) bool { return t.Name == tag.Name }); i >= 0 && i+1 < len(tags) {
+		data["Previous"] = tags[i+1].Name
+	}
 	s.render(w, r, http.StatusOK, "tag", data)
+}
+
+// compare shows what changed from one ref to another: /compare/A...B lists
+// the commits B has that A lacks and the changes they make, from where B
+// parted from A. The bare /compare is a form for picking the two.
+func (s *Server) compare(w http.ResponseWriter, r *http.Request, repo *Repo, spec string) {
+	ctx := r.Context()
+	data := map[string]any{"Title": repo.Name + ": compare", "Repo": repo, "Tab": "refs"}
+	if spec == "" {
+		q := r.URL.Query()
+		from, to := strings.TrimSpace(q.Get("from")), strings.TrimSpace(q.Get("to"))
+		if from != "" && to != "" {
+			http.Redirect(w, r, repo.URL("compare", from+"..."+to), http.StatusFound)
+			return
+		}
+		// Most often wanted: what the default branch has gained since the
+		// latest tag.
+		if from == "" {
+			if tags, _ := repo.Refs(ctx, "refs/tags"); len(tags) > 0 {
+				from = tags[0].Name
+			}
+		}
+		data["From"], data["To"] = from, cmp.Or(to, repo.DefaultBranch(ctx))
+		s.render(w, r, http.StatusOK, "compare", data)
+		return
+	}
+
+	spec, raw := cutRaw(spec)
+	// Ref names can't hold "..", so the first "..." is the one between.
+	fromRef, toRef, ok := strings.Cut(spec, "...")
+	if !ok {
+		s.notFound(w, r)
+		return
+	}
+	from, err := repo.ResolveCommit(ctx, fromRef)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	to, err := repo.ResolveCommit(ctx, toRef)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	base, err := repo.MergeBase(ctx, from, to)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if raw != "" {
+		if base == "" {
+			s.notFound(w, r)
+			return
+		}
+		if notModified(w, r, `"`+from+"..."+to+`"`) {
+			return
+		}
+		plainText(w)
+		if raw == ".patch" {
+			repo.WritePatches(ctx, w, from, to)
+		} else {
+			repo.WriteDiff(ctx, w, base, to)
+		}
+		return
+	}
+
+	data["Title"] = repo.Name + ": " + fromRef + "..." + toRef
+	data["From"], data["To"], data["Compared"] = fromRef, toRef, true
+	data["FromHash"], data["ToHash"], data["Related"] = from, to, base != ""
+	if base != "" {
+		div, err := repo.Diverged(ctx, from, to)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		commits, err := repo.Log(ctx, from+".."+to, "", compareCommits)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		diff, err := repo.DiffBetween(ctx, base, to)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		hashes := make([]string, len(commits))
+		for i, c := range commits {
+			hashes[i] = c.Hash
+		}
+		data["Ahead"], data["Behind"], data["Commits"], data["Diff"] = div.Ahead, div.Behind, commits, diff
+		data["Labels"], data["Sigs"] = s.labels(r, repo), s.signatures(ctx, repo, hashes)
+	}
+	s.render(w, r, http.StatusOK, "compare", data)
 }
 
 func (s *Server) archive(w http.ResponseWriter, r *http.Request, repo *Repo, name string) {

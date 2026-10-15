@@ -118,6 +118,15 @@ func TestRepoConfigCannotRunCommands(t *testing.T) {
 	if _, err := r.DiffBetween(ctx, "", hash); err != nil {
 		t.Fatal(err)
 	}
+	if err := r.WritePatches(ctx, io.Discard, first, hash); err != nil {
+		t.Fatal(err)
+	}
+	if base, err := r.MergeBase(ctx, first, hash); err != nil || base != first {
+		t.Fatalf("MergeBase = %q, %v; want %s", base, err, first)
+	}
+	if d, err := r.Diverged(ctx, first, hash); err != nil || d != (Divergence{Ahead: 1}) {
+		t.Fatalf("Diverged = %+v, %v; want 1 ahead", d, err)
+	}
 	if _, err := r.Refs(ctx, "refs/heads"); err != nil {
 		t.Fatal(err)
 	}

@@ -204,10 +204,11 @@ func unix(s string) time.Time {
 	return time.Unix(n, 0)
 }
 
-// Log returns up to n commits reachable from hash, optionally limited to
-// those touching path.
-func (r *Repo) Log(ctx context.Context, hash, path string, n int) ([]*Commit, error) {
-	args := []string{"log", commitFormat, "-n", strconv.Itoa(n), hash, "--"}
+// Log returns up to n commits reachable from rev, optionally limited to
+// those touching path. rev is a commit hash, or two joined by ".." for the
+// commits the second has that the first lacks.
+func (r *Repo) Log(ctx context.Context, rev, path string, n int) ([]*Commit, error) {
+	args := []string{"log", commitFormat, "-n", strconv.Itoa(n), rev, "--"}
 	if path != "" {
 		args = append(args, path)
 	}
@@ -216,6 +217,39 @@ func (r *Repo) Log(ctx context.Context, hash, path string, n int) ([]*Commit, er
 		return nil, err
 	}
 	return parseCommits(out), nil
+}
+
+// MergeBase returns the newest commit both a and b come from, or "" when
+// they share no history.
+func (r *Repo) MergeBase(ctx context.Context, a, b string) (string, error) {
+	out, err := r.run(ctx, "merge-base", a, b)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// Divergence is how far one commit has moved from another: the commits it
+// has that the other lacks (ahead), and the other way round (behind).
+type Divergence struct {
+	Ahead, Behind int
+}
+
+// Diverged counts how far head has moved from base.
+func (r *Repo) Diverged(ctx context.Context, base, head string) (Divergence, error) {
+	out, err := r.run(ctx, "rev-list", "--left-right", "--count", base+"..."+head, "--")
+	if err != nil {
+		return Divergence{}, err
+	}
+	var d Divergence
+	if _, err := fmt.Sscan(string(out), &d.Behind, &d.Ahead); err != nil {
+		return Divergence{}, fmt.Errorf("git rev-list: %q: %w", out, err)
+	}
+	return d, nil
 }
 
 // Since returns up to n commits on any branch committed after since (all of
@@ -470,6 +504,14 @@ func (r *Repo) WriteArchive(ctx context.Context, w io.Writer, hash, prefix, form
 // WritePatch streams the commit as an mbox patch, as git format-patch would.
 func (r *Repo) WritePatch(ctx context.Context, w io.Writer, hash string) error {
 	cmd := r.cmd(ctx, "format-patch", "-1", "--stdout", hash)
+	cmd.Stdout = w
+	return cmd.Run()
+}
+
+// WritePatches streams the commits reachable from to but not from from as
+// mbox patches, oldest first and without merges, as git format-patch would.
+func (r *Repo) WritePatches(ctx context.Context, w io.Writer, from, to string) error {
+	cmd := r.cmd(ctx, "format-patch", "--stdout", from+".."+to)
 	cmd.Stdout = w
 	return cmd.Run()
 }

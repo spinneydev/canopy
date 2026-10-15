@@ -1,0 +1,36 @@
+{{define "header"}}{{template "repoheader" .}}{{end}}
+
+{{define "content"}}
+<form class="compare-form" method="get" action="{{.Repo.URL "compare"}}">
+  <input name="from" value="{{.From}}" placeholder="from" aria-label="From: a branch, tag or commit">
+  <span class="muted">...</span>
+  <input name="to" value="{{.To}}" placeholder="to" aria-label="To: a branch, tag or commit">
+  <button class="btn" type="submit">compare</button>
+</form>
+{{if not .Compared}}
+<p class="muted">Two branches, tags or commits: the commits the second has that the first lacks, and the changes they make.</p>
+{{else if not .Related}}
+<div class="notice"><span class="mono">{{.From}}</span> and <span class="mono">{{.To}}</span> share no history, so there is nothing to compare.</div>
+{{else}}
+<div class="file-bar">
+  <div class="compare-summary">
+    {{if .Ahead}}<span class="mono">{{.To}}</span> is {{plural .Ahead "commit"}} ahead of <span class="mono">{{.From}}</span>{{with .Behind}}, and {{plural . "commit"}} behind{{end}}.
+    {{else}}<span class="mono">{{.To}}</span> has no commits that <span class="mono">{{.From}}</span> lacks.{{end}}
+  </div>
+  <div class="file-actions">
+    <a class="btn" href="{{.Repo.URL "compare" (printf "%s...%s" .To .From)}}" rel="nofollow">swap</a>
+    {{if .Ahead}}
+    <a class="btn" href="{{.Repo.URL "compare" (printf "%s...%s.diff" .FromHash .ToHash)}}" rel="nofollow">diff</a>
+    <a class="btn" href="{{.Repo.URL "compare" (printf "%s...%s.patch" .FromHash .ToHash)}}" rel="nofollow">patch</a>
+    {{end}}
+  </div>
+</div>
+{{if .Commits}}
+<div class="event-list">
+  {{range .Commits}}{{template "event" dict "Repo" $.Repo "C" . "Labels" (index $.Labels .Hash) "Sig" (index $.Sigs .Hash) "Full" false}}{{end}}
+</div>
+{{if gt .Ahead (len .Commits)}}<p class="muted">The newest {{len .Commits}} of {{.Ahead}}; the changes below are all of theirs.</p>{{end}}
+{{end}}
+{{if .Diff.Files}}{{template "diff" dict "Repo" .Repo "Diff" .Diff "At" .ToHash}}{{end}}
+{{end}}
+{{end}}

@@ -39,6 +39,44 @@
      downloaded from where they come from. Takes Repo and Ref. */}}
 {{define "archives"}}{{if not .Repo.Upstream}} <a href="{{.Repo.URL "archive" (printf "%s.tar.gz" .Ref)}}">.tar.gz</a> <a href="{{.Repo.URL "archive" (printf "%s.zip" .Ref)}}">.zip</a>{{end}}{{end}}
 
+{{/* A diffstat and the changes, file by file. Takes Repo, Diff and At,
+     the commit the files' view links show. */}}
+{{define "diff"}}
+<div class="diffstat">
+  <p>{{plural (len .Diff.Files) "file"}} changed, <span class="add">{{plural .Diff.Added "insertion"}}(+)</span>, <span class="del">{{plural .Diff.Deleted "deletion"}}(-)</span></p>
+  <table>
+    {{range $i, $f := .Diff.Files}}
+    <tr>
+      <td class="status s-{{.Status}}">{{.Status}}</td>
+      <td class="path"><a href="#file-{{$i}}">{{if eq .Status "R" "C"}}{{.OldPath}} &rarr; {{end}}{{.Path}}</a></td>
+      <td class="num add">+{{.Added}}</td>
+      <td class="num del">-{{.Deleted}}</td>
+    </tr>
+    {{end}}
+  </table>
+  {{if .Diff.Truncated}}<p class="notice">This diff is too large and has been truncated.</p>{{end}}
+</div>
+
+{{range $i, $f := .Diff.Files}}
+<div class="file-diff" id="file-{{$i}}">
+  <div class="file-diff-header">
+    <span class="status s-{{.Status}}">{{.Status}}</span>
+    <span class="path">{{if eq .Status "R" "C"}}{{.OldPath}} &rarr; {{end}}{{.Path}}</span>
+    {{if and .OldMode .NewMode}}<span class="muted">mode {{.OldMode}} &rarr; {{.NewMode}}</span>{{end}}
+    {{with .Similarity}}<span class="muted">{{.}} similar</span>{{end}}
+    <span class="spacer"></span>
+    {{if ne .Status "D"}}<a href="{{$.Repo.ItemURL "tree" $.At .Path}}">view</a>{{end}}
+  </div>
+  {{if .Binary}}<div class="notice">Binary file changed.</div>{{end}}
+  {{if .Hunks}}
+  <pre class="diff">{{range .Hunks}}<span class="hunk">{{.Header}}</span>
+{{- range .Lines}}<span class="{{lineclass .Kind}}">{{printf "%c" .Kind}}{{.Text}}</span>{{end}}{{end}}</pre>
+  {{end}}
+  {{if .Truncated}}<div class="notice">This file's diff is too large and has been truncated.</div>{{end}}
+</div>
+{{end}}
+{{end}}
+
 {{define "refchip"}}<span class="ref-chip" title="viewing {{.}}">{{.}}</span>{{end}}
 
 {{define "sitelink"}}<a class="site" href="/">{{.Header}}</a>{{end}}

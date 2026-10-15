@@ -301,6 +301,8 @@ func (s *Server) serveRepo(w http.ResponseWriter, r *http.Request, repo *Repo, r
 		s.tag(w, r, repo, strings.Join(rest, "/"))
 	case "log.atom", "tags.atom":
 		s.feed(w, r, repo, strings.TrimSuffix(action, ".atom"))
+	case "compare":
+		s.compare(w, r, repo, strings.Join(rest, "/"))
 	case "archive":
 		s.archive(w, r, repo, strings.Join(rest, "/"))
 	default:
@@ -318,6 +320,10 @@ func cached(action string, rest []string) bool {
 	case "commit":
 		_, raw := cutRaw(strings.Join(rest, "/"))
 		return raw == ""
+	case "compare":
+		// The bare form redirects once it is filled in.
+		_, raw := cutRaw(strings.Join(rest, "/"))
+		return len(rest) > 0 && raw == ""
 	}
 	return false
 }

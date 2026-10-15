@@ -4,7 +4,7 @@
 <div class="row">
   <div class="col-main">
     <h3>tags{{if gt .Pages 1}} <small class="muted">{{.TagCount}}</small>{{end}}</h3>
-    {{range .Tags}}
+    {{range $t := .Tags}}
     <div class="event">
       <h4>
         <a href="{{$.Repo.URL "tag" .Name}}">{{.Name}}</a>
@@ -15,6 +15,7 @@
       <div class="links">
         <a href="{{$.Repo.ItemURL "tree" .Name ""}}">browse</a>
         <a href="{{$.Repo.ItemURL "log" .Name ""}}">log</a>
+        {{with index $.Previous .Name}}<a href="{{$.Repo.URL "compare" (printf "%s...%s" . $t.Name)}}" rel="nofollow" title="since {{.}}">changes</a>{{end}}
         {{- template "archives" dict "Repo" $.Repo "Ref" .Name}}
       </div>
     </div>

@@ -20,6 +20,10 @@
   <dd class="mono"><a href="{{$.Repo.URL "commit" .Hash}}">{{.Hash}}</a></dd>
   <dt>tree</dt>
   <dd><a href="{{$.Repo.ItemURL "tree" $.Tag.Name ""}}">browse</a> <a href="{{$.Repo.ItemURL "log" $.Tag.Name ""}}">log</a>{{template "archives" dict "Repo" $.Repo "Ref" $.Tag.Name}}</dd>
+  {{with $.Previous}}
+  <dt>changes</dt>
+  <dd><a href="{{$.Repo.URL "compare" (printf "%s...%s" . $.Tag.Name)}}" rel="nofollow">since {{.}}</a></dd>
+  {{end}}
   {{end}}
 </dl>
 {{with .C}}
