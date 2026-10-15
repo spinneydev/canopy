@@ -48,8 +48,8 @@ type Server struct {
 	// Slots bounding concurrent repository requests. Downloads (clones and
 	// tarballs) have their own, smaller pool so they can never starve
 	// ordinary page views.
-	pageSlots     chan struct{}
-	downloadSlots chan struct{}
+	pageSlots     *limiter
+	downloadSlots *limiter
 	version       string // content hash appended to asset URLs for cache busting
 	started       time.Time
 	description   template.HTML // the site description, rendered from markdown
@@ -89,8 +89,8 @@ func New(cfg *config.Config) (*Server, error) {
 		chroma:        chroma,
 		theme:         themeCSS,
 		gitPath:       gitPath,
-		pageSlots:     make(chan struct{}, max(8, 4*runtime.NumCPU())),
-		downloadSlots: make(chan struct{}, max(4, runtime.NumCPU())),
+		pageSlots:     newLimiter(max(8, 4*runtime.NumCPU())),
+		downloadSlots: newLimiter(max(4, runtime.NumCPU())),
 		started:       time.Now(),
 		description:   render.Inline(cfg.Description),
 	}
@@ -195,18 +195,6 @@ const (
 	stallTimeout = 20 * time.Second
 )
 
-// acquire takes a slot from pool, waiting briefly when all are busy.
-func acquire(r *http.Request, pool chan struct{}) (release func(), ok bool) {
-	ctx, cancel := context.WithTimeout(r.Context(), queueTimeout)
-	defer cancel()
-	select {
-	case pool <- struct{}{}:
-		return func() { <-pool }, true
-	case <-ctx.Done():
-		return nil, false
-	}
-}
-
 // progressWriter enforces stallTimeout on a download (see above).
 type progressWriter struct {
 	http.ResponseWriter
@@ -240,7 +228,7 @@ func (s *Server) serveRepo(w http.ResponseWriter, r *http.Request, repo *Repo, r
 		pool = s.downloadSlots
 		w = newProgressWriter(w)
 	}
-	release, ok := acquire(r, pool)
+	release, ok := pool.acquire(r)
 	if !ok {
 		w.Header().Set("Retry-After", "10")
 		http.Error(w, "server busy, try again shortly", http.StatusServiceUnavailable)

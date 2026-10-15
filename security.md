@@ -140,12 +140,22 @@ Anubis doesn't check git clients, so canopy limits work on its own
 |---|---|
 | Concurrent page requests | `max(8, 4 × CPUs)`; a request waits at most 10 s for a slot, then gets 503 |
 | Concurrent downloads (clones, tarballs, zips) | `max(4, CPUs)`, a separate pool with the same 10 s wait, so downloads can never starve page views |
+| Of those, from one visitor | a quarter of each pool (at least 2), so one address sending slow requests can't take them all |
 | Time per page | 30 s |
 | Time per download | 10 min |
 | A download that stops moving | dropped after 20 s without progress |
 | Upload body of a clone negotiation | 64 MB |
 | Request headers | 10 s to arrive |
 | File shown with highlighting | 2 MB; larger files are offered raw |
+
+A visitor is the address a request comes from. Requests from the server
+itself or the local network are taken to come through a proxy, such as
+Caddy and Anubis: canopy reads the visitor's address from `X-Real-IP`, or
+else the last address in `X-Forwarded-For` that isn't on the local network,
+and IPv6 addresses count by their /64. A proxy that sends neither has its
+requests limited by the pools alone, as one visitor can't be told from
+another. Other addresses are never read from headers, so a visitor can't
+pass for someone else by sending one.
 
 ## The push side: the `git` account
 
