@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"mime"
 	"net/http"
+	"net/url"
 	"path"
 	"sort"
 	"strconv"
@@ -300,11 +301,85 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repo *Repo, hash, 
 		case isMarkdown(p) && r.URL.Query().Get("plain") == "":
 			data["Markdown"] = markdown(repo, data["Ref"].(string), parent(p), content)
 		default:
-			data["Lines"] = render.Lines(p, content)
+			data["Lines"] = codeLines(r.URL, render.Lines(p, content))
 		}
 		data["IsMarkdown"] = isMarkdown(p)
 	}
 	s.render(w, r, http.StatusOK, "blob", data)
+}
+
+// codeLine is a line of a file view: its number, the link its number
+// makes, whether it is selected, and its highlighted code.
+type codeLine struct {
+	No   int
+	Href string
+	Sel  bool
+	Code template.HTML
+}
+
+// codeLines numbers code for a file view whose URL is u. ?lines=N or
+// ?lines=N-M selects lines without any JavaScript, through the links on
+// the line numbers: with nothing selected, a number selects its line; with
+// one line selected, another number extends the selection to it (and its
+// own clears it); with a range selected, a number starts again.
+func codeLines(u *url.URL, code []template.HTML) []codeLine {
+	q := u.Query()
+	start, end := selection(q.Get("lines"), len(code))
+	// Links stay on this page, keeping its other parameters (?plain=1).
+	base := "./" + url.PathEscape(path.Base(u.Path))
+	link := func(from, to, jump int) string {
+		switch {
+		case from == 0:
+			q.Del("lines")
+		case from == to:
+			q.Set("lines", strconv.Itoa(from))
+		default:
+			q.Set("lines", strconv.Itoa(from)+"-"+strconv.Itoa(to))
+		}
+		href := base
+		if enc := q.Encode(); enc != "" {
+			href += "?" + enc
+		}
+		return href + "#L" + strconv.Itoa(jump)
+	}
+	lines := make([]codeLine, len(code))
+	for i, c := range code {
+		n := i + 1
+		l := codeLine{No: n, Sel: start > 0 && start <= n && n <= end, Code: c}
+		switch {
+		case start == 0 || start != end:
+			l.Href = link(n, n, n)
+		case n == start:
+			l.Href = link(0, 0, n)
+		default:
+			l.Href = link(min(n, start), max(n, start), min(n, start))
+		}
+		lines[i] = l
+	}
+	return lines
+}
+
+// selection reads ?lines (N or N-M, either way round) for a file of n
+// lines; zeros mean no selection.
+func selection(v string, n int) (start, end int) {
+	a, b, isRange := strings.Cut(v, "-")
+	start, err := strconv.Atoi(a)
+	if err != nil {
+		return 0, 0
+	}
+	end = start
+	if isRange {
+		if end, err = strconv.Atoi(b); err != nil {
+			return 0, 0
+		}
+	}
+	if start > end {
+		start, end = end, start
+	}
+	if start < 1 || start > n {
+		return 0, 0
+	}
+	return start, min(end, n)
 }
 
 func isBinary(b []byte) bool {
@@ -342,8 +417,7 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p 
 
 type blameRow struct {
 	git.BlameLine
-	No   int
-	Code template.HTML
+	codeLine
 }
 
 func (s *Server) blame(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p string) {
@@ -383,12 +457,11 @@ func (s *Server) blame(w http.ResponseWriter, r *http.Request, repo *Repo, ref, 
 		return
 	}
 	code := render.Lines(p, content)
+	code = append(code, make([]template.HTML, max(0, len(blame)-len(code)))...)
+	lines := codeLines(r.URL, code[:len(blame)])
 	rows := make([]blameRow, len(blame))
 	for i, b := range blame {
-		rows[i] = blameRow{BlameLine: b, No: i + 1}
-		if i < len(code) {
-			rows[i].Code = code[i]
-		}
+		rows[i] = blameRow{BlameLine: b, codeLine: lines[i]}
 	}
 	data["Rows"] = rows
 	s.render(w, r, http.StatusOK, "blame", data)

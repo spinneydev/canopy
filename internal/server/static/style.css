@@ -316,12 +316,28 @@ dl.kv dd a + a { margin-left: .75rem; }
   user-select: none;
 }
 .line-numbers a { color: var(--muted); }
-.line-numbers a:target { background: var(--target); color: var(--fg); }
+.line-numbers a:target, .line-numbers a.sel { background: var(--target); color: var(--fg); }
+/* Across the whole gutter, like the selected code beside it. */
+.line-numbers a.sel {
+  display: inline-block;
+  width: calc(100% + 1.2rem);
+  margin: 0 -.6rem;
+  padding: 0 .6rem;
+}
 .code-view .code {
   flex: 1;
   overflow-x: auto;
   padding-left: .75rem !important;
   padding-right: .75rem !important;
+}
+/* As wide as the longest line, so a selected line's colour spans it all
+   when scrolled sideways. */
+.code-lines { display: inline-block; min-width: 100%; }
+.code-lines .sel {
+  display: block;
+  margin: 0 -.75rem;
+  padding: 0 .75rem;
+  background: var(--target);
 }
 
 .blob-image { text-align: center; padding: 1rem; background: var(--code-bg); border: 1px solid var(--border); }
@@ -352,6 +368,8 @@ dl.kv dd a + a { margin-left: .75rem; }
 .blame .ln { width: 1%; text-align: right; border-right: 1px solid var(--border); user-select: none; }
 .blame .ln a { color: var(--muted); }
 .blame .ln a:target { background: var(--target); color: var(--fg); }
+.blame tr.sel .ln, .blame tr.sel .lc { background: var(--target); }
+.blame tr.sel .ln a { color: var(--fg); }
 
 /* commit view */
 

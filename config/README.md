@@ -231,7 +231,7 @@ name. The colours:
 | `event-bg` | commit boxes, table row hover |
 | `code-bg` | source, diffs and code blocks |
 | `btn-bg`, `btn-hover` | buttons and the active year on the activity tab |
-| `target` | the highlighted line from a `#L12` link |
+| `target` | highlighted lines, from a `#L12` or `?lines=12-20` link |
 | `add`, `add-bg`, `del`, `del-bg` | added and removed lines in diffs |
 | `hunk` | `@@` lines in diffs, renames |
 | `branch-bg`, `tag-bg` | branch and tag labels |

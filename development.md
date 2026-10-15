@@ -161,6 +161,11 @@ GB and a long time to clone.
 - **Tags**: `/tinyhttpd/tag/v0.2.0` shows the release notes, tagger,
   signature and commit; tag names on the refs, summary and log pages link
   there.
+- **Selecting lines**: on `/tinyhttpd/tree/main/item/src/main.c`, click
+  a line number, then another: both lines and those between are
+  highlighted, and the URL (`?lines=3-6`) shows the same selection when
+  opened again. Clicking a number once more starts again. The same works
+  on blame pages, and on markdown source (`?plain=1`).
 
 ## Tests and checks
 

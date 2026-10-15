@@ -19,9 +19,9 @@
 <div class="blame-view">
 <table class="blame chroma">
 {{range .Rows}}
-<tr{{if .Start}} class="start"{{end}}>
+<tr{{if .Start}} class="start{{if .Sel}} sel{{end}}"{{else if .Sel}} class="sel"{{end}}>
   <td class="blame-info">{{if .Start}}<a class="hash" href="{{$.Repo.URL "commit" .Commit.Hash}}" title="{{.Commit.Summary}}">{{short .Commit.Hash}}</a> <span class="author">{{.Commit.Author}}</span> <time title="{{date .Commit.When}}">{{ago .Commit.When}}</time>{{end}}</td>
-  <td class="ln"><a id="L{{.No}}" href="#L{{.No}}">{{.No}}</a></td>
+  <td class="ln"><a id="L{{.No}}" href="{{.Href}}">{{.No}}</a></td>
   <td class="lc">{{.Code}}</td>
 </tr>
 {{end}}
