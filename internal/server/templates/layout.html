@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{if and .Title (ne .Title .Site)}}{{.Title}} - {{end}}{{.Site}}</title>
-<link rel="icon" href="/favicon.ico?v={{.V}}">
+{{with .Canonical}}<link rel="canonical" href="{{.}}">
+{{end}}<link rel="icon" href="/favicon.ico?v={{.V}}">
 <link rel="stylesheet" href="/_static/style.css?v={{.V}}">
 <link rel="stylesheet" href="/_static/chroma.css?v={{.V}}">
 {{if .HasFonts}}<link rel="stylesheet" href="/_static/fonts.css">

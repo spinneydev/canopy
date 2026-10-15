@@ -3,6 +3,7 @@ package server
 import (
 	"html/template"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -44,5 +45,24 @@ func TestLineSelection(t *testing.T) {
 	ls = links("/r/tree/main/item/a.c?lines=2-3")
 	if ls[4].Href != "./a.c?lines=5#L5" || ls[0].Sel || !ls[1].Sel || !ls[2].Sel || ls[3].Sel {
 		t.Errorf("range links = %+v", ls)
+	}
+}
+
+// Crawlers would fetch a file once per line through the line links, so they
+// are nofollow, and the page names its address without ?lines.
+func TestLineLinksKeepCrawlersOff(t *testing.T) {
+	s, _, _ := projServer(t)
+	for _, u := range []string{"/proj/tree/main/item/a.txt?lines=1", "/proj/blame/main/item/a.txt?lines=1"} {
+		code, body := get(s, u)
+		if code != 200 {
+			t.Fatalf("%s: %d", u, code)
+		}
+		if !strings.Contains(body, `href="./a.txt#L1" rel="nofollow"`) {
+			t.Errorf("%s: line link isn't nofollow", u)
+		}
+		want := `<link rel="canonical" href="http://example.com` + strings.TrimSuffix(u, "?lines=1") + `">`
+		if !strings.Contains(body, want) {
+			t.Errorf("%s: lacks %s", u, want)
+		}
 	}
 }

@@ -10,7 +10,10 @@ import (
 	"spinney.dev/canopy/internal/config"
 )
 
-func TestPagesAnswerNotModified(t *testing.T) {
+// projServer serves a repository "proj" with one commit of a.txt, tagged
+// v1, and returns a function running git in its work tree.
+func projServer(t *testing.T) (*Server, func(args ...string), string) {
+	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
@@ -39,6 +42,11 @@ func TestPagesAnswerNotModified(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return s, run, work
+}
+
+func TestPagesAnswerNotModified(t *testing.T) {
+	s, run, work := projServer(t)
 	request := func(url, etag string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", url, nil)

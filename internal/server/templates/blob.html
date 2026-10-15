@@ -26,7 +26,7 @@
 <div class="notice">This file is too large to display. <a href="{{.Repo.ItemURL "blob" .Ref .Path}}">View it raw</a> instead.</div>
 {{else}}
 <div class="code-view">
-<pre class="line-numbers">{{range .Lines}}<a id="L{{.No}}" href="{{.Href}}"{{if .Sel}} class="sel"{{end}}>{{.No}}</a>
+<pre class="line-numbers">{{range .Lines}}<a id="L{{.No}}" href="{{.Href}}" rel="nofollow"{{if .Sel}} class="sel"{{end}}>{{.No}}</a>
 {{end}}</pre>
 <pre class="code chroma"><span class="code-lines">{{range .Lines}}{{if .Sel}}<span class="sel">{{.Code}}
 </span>{{else}}{{.Code}}

@@ -278,6 +278,7 @@ var imageExts = map[string]bool{
 
 func (s *Server) blob(w http.ResponseWriter, r *http.Request, repo *Repo, hash, p string, data map[string]any) {
 	ctx := r.Context()
+	data["Canonical"] = s.canonical(r)
 	size, err := repo.BlobSize(ctx, hash, p)
 	if err != nil {
 		s.fail(w, r, err)
@@ -357,6 +358,18 @@ func codeLines(u *url.URL, code []template.HTML) []codeLine {
 		lines[i] = l
 	}
 	return lines
+}
+
+// canonical is a file page's address without ?lines, so that search
+// engines count every selection of a file as the file itself.
+func (s *Server) canonical(r *http.Request) string {
+	q := r.URL.Query()
+	q.Del("lines")
+	u := s.baseURL(r) + r.URL.EscapedPath()
+	if enc := q.Encode(); enc != "" {
+		u += "?" + enc
+	}
+	return u
 }
 
 // selection reads ?lines (N or N-M, either way round) for a file of n
@@ -444,6 +457,7 @@ func (s *Server) blame(w http.ResponseWriter, r *http.Request, repo *Repo, ref, 
 	data := map[string]any{
 		"Title": repo.Name + ": blame " + p, "Repo": repo, "Tab": "tree",
 		"Ref": ref, "Hash": hash, "Path": p, "Crumbs": crumbs(p), "Size": size,
+		"Canonical": s.canonical(r),
 	}
 	if size > maxBlobBytes {
 		data["TooLarge"] = true
