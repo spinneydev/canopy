@@ -343,7 +343,11 @@ func (s *Server) pageNotModified(w http.ResponseWriter, r *http.Request, repo *R
 	}
 	if times {
 		// The newest time on a page is shown in the finest unit, and older
-		// ones in coarser units, so the newest sets the step.
+		// ones in coarser units, so the newest sets the step. The footer
+		// shows when canopy started.
+		if s.started.After(newest) {
+			newest = s.started
+		}
 		step := 24 * time.Hour
 		switch age := time.Since(newest); {
 		case age < time.Hour:
