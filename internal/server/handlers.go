@@ -400,6 +400,17 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p 
 		s.notFound(w, r)
 		return
 	}
+	id, err := repo.ObjectID(ctx, hash, p)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	// By the blob, not the commit: a file stays cached until it changes.
+	h := w.Header()
+	h.Set("Cache-Control", "public, max-age=300")
+	if notModified(w, r, `"`+id+`"`) {
+		return
+	}
 	// Never let repository content render as a page on our origin: images
 	// keep their type, everything else is plain text, and the sandbox CSP
 	// neutralizes scripts in SVG.
@@ -407,11 +418,9 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p 
 	if ext := strings.ToLower(path.Ext(p)); imageExts[ext] {
 		ctype = mime.TypeByExtension(ext)
 	}
-	h := w.Header()
 	h.Set("Content-Type", ctype)
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
-	h.Set("Cache-Control", "public, max-age=300")
 	repo.WriteBlob(ctx, w, hash, p)
 }
 
@@ -516,6 +525,9 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request, repo *Repo, rev 
 		return
 	}
 	if patch {
+		if notModified(w, r, `"`+hash+`"`) {
+			return
+		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		repo.WritePatch(ctx, w, hash)
@@ -612,6 +624,11 @@ func (s *Server) archive(w http.ResponseWriter, r *http.Request, repo *Repo, nam
 	hash, err := repo.ResolveCommit(r.Context(), ref)
 	if err != nil {
 		s.fail(w, r, err)
+		return
+	}
+	// Weak: the same files, though another git or gzip may pack them
+	// differently.
+	if notModified(w, r, `W/"`+hash+`"`) {
 		return
 	}
 	prefix := repo.Base() + "-" + strings.ReplaceAll(strings.TrimPrefix(ref, "v"), "/", "-")

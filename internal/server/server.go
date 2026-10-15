@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -278,6 +279,9 @@ func (s *Server) serveRepo(w http.ResponseWriter, r *http.Request, repo *Repo, r
 	ref, p := splitItem(rest)
 	p = strings.Trim(path.Clean("/"+p), "/")
 
+	if cached(action, rest) && s.pageNotModified(w, r, repo, !strings.HasSuffix(action, ".atom")) {
+		return
+	}
 	switch action {
 	case "":
 		s.summary(w, r, repo)
@@ -302,6 +306,70 @@ func (s *Server) serveRepo(w http.ResponseWriter, r *http.Request, repo *Repo, r
 	default:
 		s.notFound(w, r)
 	}
+}
+
+// cached reports whether an action's pages carry pageNotModified's ETag.
+// Raw files, patches and tarballs depend only on what they are cut from,
+// and their handlers tag them by that instead.
+func cached(action string, rest []string) bool {
+	switch action {
+	case "", "tree", "blame", "log", "refs", "tag", "log.atom", "tags.atom":
+		return true
+	case "commit":
+		return !strings.HasSuffix(strings.Join(rest, "/"), ".patch")
+	}
+	return false
+}
+
+// pageNotModified tags a repository page with an ETag and answers 304 Not
+// Modified when the browser already has that version. The tag covers all a
+// page shows: canopy itself (templates, config), the repository's refs and
+// details and, with times set, how old its relative times ("3 hours ago")
+// are, to the unit they are shown in.
+func (s *Server) pageNotModified(w http.ResponseWriter, r *http.Request, repo *Repo, times bool) bool {
+	ctx := r.Context()
+	state, newest, err := repo.State(ctx)
+	if err != nil {
+		return false // the page itself will report it
+	}
+	parts := []string{s.version, strconv.FormatInt(s.started.UnixNano(), 10), r.URL.RequestURI(), state,
+		repo.Description, repo.Homepage, repo.Maintainer}
+	if repo.Upstream != "" {
+		synced, failure := repo.SyncStatus(ctx)
+		parts = append(parts, strconv.FormatInt(synced.Unix(), 10), failure)
+		if synced.After(newest) {
+			newest = synced
+		}
+	}
+	if times {
+		// The newest time on a page is shown in the finest unit, and older
+		// ones in coarser units, so the newest sets the step.
+		step := 24 * time.Hour
+		switch age := time.Since(newest); {
+		case age < time.Hour:
+			step = time.Minute
+		case age < 24*time.Hour:
+			step = time.Hour
+		}
+		parts = append(parts, strconv.FormatInt(time.Now().Truncate(step).Unix(), 10))
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	w.Header().Set("Cache-Control", "no-cache")
+	return notModified(w, r, `"`+hex.EncodeToString(sum[:12])+`"`)
+}
+
+// notModified sets etag on the response and answers 304 Not Modified when
+// the request's If-None-Match holds it.
+func notModified(w http.ResponseWriter, r *http.Request, etag string) bool {
+	w.Header().Set("ETag", etag)
+	for t := range strings.SplitSeq(r.Header.Get("If-None-Match"), ",") {
+		t = strings.TrimSpace(t)
+		if t != "" && strings.TrimPrefix(t, "W/") == strings.TrimPrefix(etag, "W/") {
+			w.WriteHeader(http.StatusNotModified)
+			return true
+		}
+	}
+	return false
 }
 
 func splitItem(segs []string) (ref, p string) {

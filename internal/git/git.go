@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -396,6 +398,15 @@ func (r *Repo) ObjectType(ctx context.Context, hash, path string) (string, error
 	return strings.TrimSpace(string(out)), nil
 }
 
+// ObjectID returns the id of path in commit hash.
+func (r *Repo) ObjectID(ctx context.Context, hash, path string) (string, error) {
+	out, err := r.run(ctx, "rev-parse", "--verify", "--quiet", hash+":"+path)
+	if err != nil {
+		return "", ErrNotFound
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 func (r *Repo) BlobSize(ctx context.Context, hash, path string) (int64, error) {
 	out, err := r.run(ctx, "cat-file", "-s", hash+":"+path)
 	if err != nil {
@@ -531,6 +542,29 @@ func stripSignature(msg string) string {
 		}
 	}
 	return strings.TrimSpace(msg)
+}
+
+// State sums up the repository's refs and HEAD, which change with every
+// push, new tag or mirror update: equal states show the same history. newest
+// is the latest commit or tag date among them.
+func (r *Repo) State(ctx context.Context) (state string, newest time.Time, err error) {
+	out, err := r.run(ctx, "for-each-ref", "--format=%(refname) %(objectname) %(creatordate:unix)")
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	head, err := os.ReadFile(r.Dir + "/HEAD")
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		if i := strings.LastIndexByte(line, ' '); i >= 0 {
+			if t := unix(line[i+1:]); t.After(newest) {
+				newest = t
+			}
+		}
+	}
+	sum := sha256.Sum256(append(head, out...))
+	return hex.EncodeToString(sum[:]), newest, nil
 }
 
 // LastUpdated returns the newest committer date across all branches.

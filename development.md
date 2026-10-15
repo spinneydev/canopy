@@ -166,6 +166,8 @@ GB and a long time to clone.
   highlighted, and the URL (`?lines=3-6`) shows the same selection when
   opened again. Clicking a number once more starts again. The same works
   on blame pages, and on markdown source (`?plain=1`).
+- **Caching**: reloading a page answers 304 in the browser's
+  network tab (F12); after a push to the repository it answers 200 again.
 
 ## Tests and checks
 

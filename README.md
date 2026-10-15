@@ -139,6 +139,10 @@ On tree and blame pages, `?lines=12` or `?lines=12-20` highlights lines;
 clicking a line number selects it, and clicking another extends the
 selection to there.
 
+Pages carry an ETag, so a browser or feed reader asking again gets a short
+"not modified" until something is pushed. Raw files, patches and tarballs
+stay cached until what they hold changes.
+
 `git clone https://host/{repo}` uses git's smart HTTP protocol, fetch only.
 
 ## Source layout

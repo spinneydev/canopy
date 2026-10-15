@@ -206,3 +206,29 @@ func TestTag(t *testing.T) {
 		}
 	}
 }
+
+func TestState(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	work := t.TempDir()
+	gitIn(t, work, "", "init", "-q", "-b", "main")
+	gitIn(t, work, "", "commit", "-q", "--allow-empty", "-m", "one")
+
+	ctx := context.Background()
+	r := &Repo{Dir: filepath.Join(work, ".git")}
+	before, newest, err := r.State(ctx)
+	if err != nil || newest.IsZero() {
+		t.Fatalf("State = %q, %v, %v", before, newest, err)
+	}
+	gitIn(t, work, "", "tag", "v2")
+	if after, _, _ := r.State(ctx); after == before {
+		t.Error("State unchanged by a new tag")
+	}
+	before, _, _ = r.State(ctx)
+	gitIn(t, work, "", "branch", "other")
+	gitIn(t, work, "", "symbolic-ref", "HEAD", "refs/heads/other")
+	if after, _, _ := r.State(ctx); after == before {
+		t.Error("State unchanged by a new branch and HEAD")
+	}
+}
