@@ -35,7 +35,8 @@ func mergedHistory(t *testing.T, run func(args ...string), work string) {
 
 var commitLink = regexp.MustCompile(`class="hash" href="/proj/commit/([0-9a-f]+)"`)
 
-// Following "next" shows every commit once, side's included.
+// Following "next" shows every commit once, side's included, and draws the
+// graph on every page.
 func TestLogPagesShowEveryCommit(t *testing.T) {
 	s, run, work := projServer(t)
 	t.Setenv("GIT_COMMITTER_DATE", "1700000000 +0000")
@@ -50,6 +51,9 @@ func TestLogPagesShowEveryCommit(t *testing.T) {
 		code, body := get(s, strings.ReplaceAll(u, "&amp;", "&"))
 		if code != 200 {
 			t.Fatalf("%s: %d", u, code)
+		}
+		if !strings.Contains(body, `class="lane node`) || !strings.Contains(body, `<svg class="bend"`) {
+			t.Errorf("%s: no graph", u)
 		}
 		for _, m := range commitLink.FindAllStringSubmatch(body, -1) {
 			if seen[m[1]] {

@@ -527,6 +527,11 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request, repo *Repo, ref, p 
 		"Repo": repo, "Tab": "log", "Ref": ref, "Path": p, "Crumbs": crumbs(p),
 		"Labels": s.labels(r, repo), "Paged": tip != hash || skip > 0,
 	}
+	// A file's history leaves out the commits between, so its lines
+	// wouldn't join up.
+	if p == "" {
+		data["Graph"] = graph(ctx, repo, tip, skip, commits)
+	}
 	if len(commits) > logPageSize {
 		commits = commits[:logPageSize]
 		next := url.Values{"from": {tip}, "skip": {strconv.Itoa(skip + logPageSize)}}

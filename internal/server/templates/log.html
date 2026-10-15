@@ -5,8 +5,18 @@
   <div class="file-path">{{if .Path}}log: {{template "crumbs" .}}{{else}}log{{end}}</div>
   <div class="file-actions">{{template "refchip" .Ref}}</div>
 </div>
-<div class="event-list">
-  {{range .Commits}}{{template "event" dict "Repo" $.Repo "C" . "Labels" (index $.Labels .Hash) "Sig" (index $.Sigs .Hash) "Full" true}}{{else}}<p class="muted">No commits.</p>{{end}}
+<div class="event-list{{if .Graph}} graph{{end}}">
+  {{range $i, $c := .Commits}}
+  {{- $event := dict "Repo" $.Repo "C" . "Labels" (index $.Labels .Hash) "Sig" (index $.Sigs .Hash) "Full" true}}
+  {{- with $.Graph}}{{with index .Rows $i}}
+  {{with .Above}}{{template "bend" .}}{{end}}
+  <div class="graph-row">
+    <div class="lanes" aria-hidden="true">{{range .Cells}}<span class="lane {{.}}"></span>{{end}}</div>
+    {{template "event" $event}}
+  </div>
+  {{- end}}{{else}}{{template "event" $event}}{{end}}
+  {{- else}}<p class="muted">No commits.</p>{{end}}
+  {{with .Graph}}{{with .Below}}{{template "bend" .}}{{end}}{{end}}
 </div>
 <div class="pager">
   {{if .Paged}}<a class="btn" href="{{.Repo.ItemURL "log" .Ref .Path}}">&laquo; newest</a>{{end}}

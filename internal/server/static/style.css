@@ -428,6 +428,41 @@ pre.diff .nonl { color: var(--muted); }
 /* log */
 
 .pager { display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1rem; }
+
+/* the commit graph beside the log (graph.go): a row of lanes beside each
+   commit, its lines drawn as backgrounds so they stretch with the commit,
+   and a 12px SVG between commits where lines bend */
+.lane-0 { --lane: var(--link); }
+.lane-1 { --lane: var(--hunk); }
+.lane-2 { --lane: var(--add); }
+.lane-3 { --lane: var(--del); }
+.graph-row { display: flex; }
+.graph-row .event { flex: 1; min-width: 0; margin-bottom: 0; }
+.lanes { display: flex; flex: none; margin-right: .5rem; }
+.lane {
+  /* the dot sits level with the commit's first line */
+  --dot: 1.3rem;
+  position: relative;
+  width: 12px;
+  background: no-repeat linear-gradient(var(--lane), var(--lane));
+  background-size: 0 0;
+}
+.lane.pass, .lane.in.out { background-position: center top; background-size: 2px 100%; }
+.lane.in { background-position: center top; background-size: 2px var(--dot); }
+.lane.out { background-position: center var(--dot); background-size: 2px 100%; }
+.lane.node::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: calc(var(--dot) - 4px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lane);
+}
+.lane.merge::after { background: var(--bg); border: 2px solid var(--lane); }
+.bend { display: block; }
+.bend path { fill: none; stroke: var(--lane); stroke-width: 2; }
 .sync-error { color: var(--del); }
 
 /* activity */

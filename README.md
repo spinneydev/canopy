@@ -10,10 +10,10 @@ issues or pull requests.
 
 - **Browse:** an index of every repository (grouped by folder), summaries
   with the README and the license, trees with syntax highlighting, rendered markdown, raw
-  files, blame, history, commits with diffs and `.diff` and `.patch`
-  downloads, comparisons between any two refs, refs with how far each
-  branch is from the default one, tags with their release notes, and
-  tarballs and zips. Links can select lines of a file.
+  files, blame, history with a commit graph, commits with diffs and
+  `.diff` and `.patch` downloads, comparisons between any two refs, refs
+  with how far each branch is from the default one, tags with their
+  release notes, and tarballs and zips. Links can select lines of a file.
 - **Clone** anything over HTTPS (`git clone https://git.example.com/NAME`).
   Pushing over HTTP is never possible.
 - **Push** over SSH to a locked-down `git` account. Pushing to a name that
@@ -128,7 +128,7 @@ slashes.
     /{repo}/tree/{ref}/item/{path}       folder listing or highlighted file
     /{repo}/blob/{ref}/item/{path}       raw file
     /{repo}/blame/{ref}/item/{path}      blame
-    /{repo}/log/{ref}/item/{path}        history, paginated
+    /{repo}/log/{ref}/item/{path}        history, paginated, with a commit graph for the whole repository
     /{repo}/commit/{hash}                commit with diff (.diff for a plain diff, .patch for a mailbox patch)
     /{repo}/compare/{from}...{to}        the commits {to} has that {from} lacks, and their changes (.diff, .patch)
     /{repo}/compare                      a form for picking two refs to compare

@@ -219,6 +219,22 @@ func (r *Repo) Log(ctx context.Context, rev, path string, skip, n int) ([]*Commi
 	return parseCommits(out), nil
 }
 
+// Parents lists the first n commits of hash's log, in the order Log gives
+// them, each as its hash followed by its parents'.
+func (r *Repo) Parents(ctx context.Context, hash string, n int) ([][]string, error) {
+	out, err := r.run(ctx, "log", "--format=%H %P", "-n", strconv.Itoa(n), hash, "--")
+	if err != nil {
+		return nil, err
+	}
+	var commits [][]string
+	for line := range strings.SplitSeq(string(out), "\n") {
+		if f := strings.Fields(line); len(f) > 0 {
+			commits = append(commits, f)
+		}
+	}
+	return commits, nil
+}
+
 // MergeBase returns the newest commit both a and b come from, or "" when
 // they share no history.
 func (r *Repo) MergeBase(ctx context.Context, a, b string) (string, error) {

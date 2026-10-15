@@ -77,6 +77,9 @@
 {{end}}
 {{end}}
 
+{{/* The commit graph's lines between two rows of the log (graph.go). */}}
+{{define "bend"}}<svg class="bend" width="{{.Width}}" height="12" viewBox="0 0 {{.Width}} 12" aria-hidden="true">{{range .Lines}}<path class="lane-{{.Color}}" d="M{{.X1}} 0C{{.X1}} 6 {{.X2}} 6 {{.X2}} 12"/>{{end}}</svg>{{end}}
+
 {{define "refchip"}}<span class="ref-chip" title="viewing {{.}}">{{.}}</span>{{end}}
 
 {{define "sitelink"}}<a class="site" href="/">{{.Header}}</a>{{end}}

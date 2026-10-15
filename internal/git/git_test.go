@@ -130,6 +130,9 @@ func TestRepoConfigCannotRunCommands(t *testing.T) {
 	if d, err := r.BranchesDiverged(ctx, first); err != nil || d["main"] == nil || *d["main"] != (Divergence{Ahead: 1}) {
 		t.Fatalf("BranchesDiverged = %v, %v; want main 1 ahead", d, err)
 	}
+	if p, err := r.Parents(ctx, hash, 5); err != nil || len(p) != 2 || p[0][0] != hash || p[0][1] != first {
+		t.Fatalf("Parents = %v, %v", p, err)
+	}
 	if _, err := r.Refs(ctx, "refs/heads"); err != nil {
 		t.Fatal(err)
 	}
