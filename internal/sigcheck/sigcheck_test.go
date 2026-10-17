@@ -155,6 +155,30 @@ func TestSignatureKinds(t *testing.T) {
 	}
 }
 
+func TestMerge(t *testing.T) {
+	dir := t.TempDir()
+	alice, _, alicePub := newKey(t, dir, 5)
+	bob, _, bobPub := newKey(t, dir, 6)
+	listed, err := NewKeys(map[string][]string{"alice": {alicePub}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Alice's key listed under another name, bad lines and Bob's key.
+	merged := listed.Merge(map[string][]string{
+		"mallory": {alicePub, "ssh-ed25519 nonsense", "restrict " + bobPub},
+		"bob":     {bobPub},
+	})
+	if merged.Len() != 2 || listed.Len() != 1 {
+		t.Fatalf("merged %d keys (want 2), listed %d (want 1)", merged.Len(), listed.Len())
+	}
+	body := []byte("object 0123\ntype commit\ntag v1\ntagger x <a@b> 1700000000 +0000\n\nv1\n")
+	for signer, want := range map[ssh.Signer]string{alice: "alice", bob: "bob"} {
+		if got := merged.Tag(append(body, sign(t, signer, "git", body)...)); got.Status != Verified || got.Signer != want {
+			t.Errorf("%s's tag: %+v", want, got)
+		}
+	}
+}
+
 func TestNewKeysRefuses(t *testing.T) {
 	_, _, pub := newKey(t, t.TempDir(), 4)
 	for name, keys := range map[string]map[string][]string{

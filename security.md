@@ -173,6 +173,17 @@ Pushes arrive over SSH as the `git` account, which is built to do one thing:
   the account can't add keys for itself. Only the keys given with
   `--push-key`, and those fetched from GitHub with `--github-keys` at
   install time, are there.
+- **With `--github-sync`**, `canopy-github-keys` (a root systemd timer,
+  every 15 minutes) fetches `https://github.com/USER.keys` again for the
+  users named with `--github-keys` and `--admin-github`, and replaces only
+  the lines labelled `github:USER`. Whoever controls those GitHub accounts
+  controls who can push (and, with `--admin-github`, log in as the admin
+  account; sudo still needs its password). Every key is checked with
+  `ssh-keygen` and gets the same `restrict` as the others. A failed fetch
+  changes nothing; a user GitHub answers 404 for loses its keys (a deleted
+  account's name can be registered again by someone else). An admin account
+  is never left without a key. The new file is made with `mktemp` and
+  renamed into place, so a link planted in `~/.ssh` isn't followed.
 - **Every login goes through `serve`** (sshd `ForceCommand`). On a push to a
   repository that doesn't exist, `serve` asks `create` to make it; anything
   else goes to `git-shell` exactly as sshd would have passed it. `serve`

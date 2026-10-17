@@ -13,6 +13,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
+	"spinney.dev/canopy/internal/ghkeys"
 	"spinney.dev/canopy/internal/sigcheck"
 	"spinney.dev/canopy/internal/theme"
 )
@@ -54,7 +55,23 @@ type Activity struct {
 // Signatures turns on signature badges on commits and tags. A good SSH
 // signature by one of these keys shows as verified, with the key's name.
 type Signatures struct {
-	Keys map[string][]string `toml:"keys"` // name → SSH public keys
+	Keys   map[string][]string `toml:"keys"`   // name → SSH public keys
+	GitHub map[string]string   `toml:"github"` // name → GitHub user whose SSH signing keys count too
+}
+
+func checkSignatures(s Signatures) error {
+	if _, err := sigcheck.NewKeys(s.Keys); err != nil {
+		return fmt.Errorf("signatures: keys: %w", err)
+	}
+	for name, user := range s.GitHub {
+		if name == "" || len(name) > 64 || strings.ContainsFunc(name, unicode.IsControl) {
+			return fmt.Errorf("signatures: github: %q isn't a name of at most 64 characters", name)
+		}
+		if !ghkeys.ValidUser(user) {
+			return fmt.Errorf("signatures: github: %s: %q isn't a GitHub user name", name, user)
+		}
+	}
+	return nil
 }
 
 // Theme picks the site's colours and fonts, nothing else. Colour themes are
@@ -156,8 +173,8 @@ func Load(path string) (*Config, error) {
 	if err := checkTheme(cfg.Theme, cfg.Themes); err != nil {
 		return nil, err
 	}
-	if _, err := sigcheck.NewKeys(cfg.Signatures.Keys); err != nil {
-		return nil, fmt.Errorf("signatures: keys: %w", err)
+	if err := checkSignatures(cfg.Signatures); err != nil {
+		return nil, err
 	}
 	return cfg, nil
 }

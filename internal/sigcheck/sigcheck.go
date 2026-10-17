@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"unicode"
@@ -70,6 +71,30 @@ func NewKeys(byName map[string][]string) (*Keys, error) {
 		}
 	}
 	return k, nil
+}
+
+// Merge returns a copy of k that also trusts more keys, by name, such as
+// those fetched from GitHub. A key k already trusts keeps its name, and a
+// line that isn't a plain public key is skipped: these come from elsewhere,
+// so one bad entry mustn't turn the badges off.
+func (k *Keys) Merge(byName map[string][]string) *Keys {
+	m := &Keys{names: maps.Clone(k.names)}
+	for _, name := range slices.Sorted(maps.Keys(byName)) {
+		for _, line := range byName[name] {
+			pub, _, options, _, err := ssh.ParseAuthorizedKey([]byte(line))
+			if err != nil || len(options) > 0 {
+				continue
+			}
+			if _, ok := pub.(*ssh.Certificate); ok {
+				continue
+			}
+			fp := ssh.FingerprintSHA256(pub)
+			if _, ok := m.names[fp]; !ok {
+				m.names[fp] = name
+			}
+		}
+	}
+	return m
 }
 
 // Len is the number of trusted keys.

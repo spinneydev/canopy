@@ -104,6 +104,7 @@ It connects once and asks (Enter takes the default in brackets):
     Anubis challenge: nojs (no JavaScript) or pow (proof-of-work) [nojs]:
     Public key files allowed to push, comma-separated (none: no pushing) [~/.ssh/id_ed25519.pub]:
     Also allow the SSH keys of GitHub users to push, comma-separated (none: no) [none]:
+    Keep them in sync (the server checks GitHub every 15 minutes, ...) [Y/n]:   (only with GitHub users)
     Refuse pushes that rewrite or delete branches [Y/n]:
     Let push keys rename and delete repositories [y/N]:
     Harden the server (firewall, key-only SSH, automatic updates) [Y/n]:
@@ -167,9 +168,9 @@ which asks for its password.
 
 `--dry-run` shows the whole run without changing anything, on your machine
 or the server. Flags answer questions in advance: `--domain`, `--email`,
-`--anubis`, `--challenge pow`, `--push-key FILE`, `--github-keys USER`,
+`--anubis`, `--challenge pow`, `--push-key FILE`, `--github-keys USER`, `--github-sync`,
 `--deny-force-push`, `--manage-repos`, `--self-update`, `--harden`, `--tailscale` / `--no-tailscale`, `--tailscale-key FILE`,
-`--admin-user NAME`. With `--yes`, give the Tailscale key with
+`--admin-user NAME`, `--admin-github USER`. With `--yes`, give the Tailscale key with
 `--tailscale-key FILE` or `TS_AUTHKEY`; no sudo password is asked, so root
 logins stay on until you set one (`sudo passwd alice`) and deploy again. On
 macOS, run the script with a newer bash (`brew install bash`).
@@ -363,6 +364,7 @@ in the tailnet before closing the first session.
 | `--anubis`, `--challenge nojs\|pow` | Anubis in front of canopy, and its browser check |
 | `--push-key FILE` | keys allowed to push (repeatable; replaces the list) |
 | `--github-keys USER` | also allow USER's keys from `https://github.com/USER.keys` (repeatable; fetched on every run) |
+| `--github-sync` | fetch the GitHub keys (`--github-keys`, `--admin-github`) again every 15 minutes on the server (`canopy-github-keys.timer`), so changes on GitHub count without a deploy |
 | `--deny-force-push` | refuse pushes that rewrite or delete branches |
 | `--manage-repos` | let push keys `rename` and `delete` repositories over SSH (off: a stolen key could erase one) |
 | `--self-update`, `--update-from URL` | install `canopy-update`, which builds the newest release on the server and switches to it; releases from URL (https, default `https://github.com/spinneydev/canopy`) |
@@ -370,6 +372,7 @@ in the tailnet before closing the first session.
 | `--ssh-allow USER` | with `--harden`: also let this account log in |
 | `--admin-user NAME` | admin account with sudo; with `--harden`, root logins go off once it has a key and a password |
 | `--admin-key FILE`, `--admin-password-hash FILE` | that account's keys (default: those of whoever runs the installer; when deploying, those root logs in with) and password hash |
+| `--admin-github USER` | also let USER's GitHub keys log in as that account (kept current with `--github-sync`; its last key is never removed) |
 | `--tailscale`, `--tailscale-key FILE` | with `--harden`: join the tailnet and accept SSH only from it |
 | `--undo-ssh-hardening` | back to the system's own SSH settings, SSH open in the firewall |
 | `--uninstall` | remove canopy, `canopy-update`, Anubis and the Caddy site (keeps repositories, config, the `git` account and the hardening) |

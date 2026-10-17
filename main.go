@@ -151,6 +151,9 @@ func printConfig(path string, cfg *config.Config) {
 	for _, k := range keys.List() {
 		fmt.Printf("signature key %s\n", k)
 	}
+	for _, name := range slices.Sorted(maps.Keys(cfg.Signatures.GitHub)) {
+		fmt.Printf("signature github %s: %s\n", name, cfg.Signatures.GitHub[name])
+	}
 	fmt.Printf("theme.sans: %s\n", cfg.Theme.Sans)
 	fmt.Printf("theme.mono: %s\n", cfg.Theme.Mono)
 	fmt.Printf("theme.light: %s\n", cmp.Or(cfg.Theme.Light, "default"))

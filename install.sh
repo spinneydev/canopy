@@ -64,6 +64,7 @@ BINARY=
 PUSH_KEYS=()
 GITHUB_USERS=() # GitHub users whose public keys may push too
 GH_KEYS=        # temporary file with the keys fetched from GitHub
+GITHUB_SYNC=0   # fetch the GitHub keys again every 15 minutes (canopy-github-keys)
 DENY_FORCE_PUSH=0
 MANAGE_REPOS=0  # let push keys rename and delete repositories
 SELF_UPDATE=0   # install canopy-update, which builds the newest release on the server
@@ -74,6 +75,7 @@ TAILSCALE=0
 TS_KEY_FILE=    # auth key for joining the tailnet; read only when needed
 ADMIN_USER=     # account to log in as instead of root
 ADMIN_KEY=      # its SSH keys (default: those of whoever runs this)
+ADMIN_GITHUB=   # GitHub user whose SSH keys can log in as it too
 ADMIN_PW_HASH=  # file with its password hash, for sudo
 UNDO_SSH=0
 UNINSTALL=0
@@ -92,6 +94,10 @@ UNIT=/etc/systemd/system/canopy.service
 CACHE=/var/cache/canopy # the unit's CacheDirectory: downloaded [theme] fonts
 MIRROR_UNIT=/etc/systemd/system/canopy-mirror.service
 MIRROR_TIMER=/etc/systemd/system/canopy-mirror.timer
+GH_SYNC_CMD=/usr/local/sbin/canopy-github-keys
+GH_SYNC_CONF=/etc/canopy/github-keys.conf # the GitHub users it follows
+GH_SYNC_UNIT=/etc/systemd/system/canopy-github-keys.service
+GH_SYNC_TIMER=/etc/systemd/system/canopy-github-keys.timer
 UPDATE_CMD=/usr/local/sbin/canopy-update
 UPDATE_LIB=/usr/local/lib/canopy-update # its build script and Go
 UPDATE_STATE=/var/lib/canopy-update     # the source clone and Go caches
@@ -182,6 +188,10 @@ Pushing over SSH:
   --github-keys USER   also allow pushes from the SSH keys USER has on GitHub
                        (https://github.com/USER.keys); may be repeated. The
                        keys are fetched on every run.
+  --github-sync        keep the keys from GitHub (--github-keys and
+                       --admin-github) in sync: the server fetches them
+                       again every 15 minutes, so a key added to or removed
+                       from GitHub counts without running this again
   --deny-force-push    refuse pushes that rewrite or delete branches
   --manage-repos       let push keys rename and delete repositories
                        (ssh $GIT_USER@HOST rename / delete). Off by default:
@@ -210,6 +220,8 @@ Server hardening:
                        root logins over SSH are turned off once that
                        account has a key and a password.
   --admin-key FILE     public key(s) for a new --admin-user
+  --admin-github USER  also let the SSH keys USER has on GitHub log in as
+                       --admin-user (sudo still asks for its password)
   --admin-password-hash FILE
                        crypt hash (openssl passwd -6) to set as the new
                        --admin-user's password, which sudo asks for
@@ -298,6 +310,7 @@ while (($#)); do
 	--binary) BINARY=${2:?--binary needs a file}; shift ;;
 	--push-key) PUSH_KEYS+=("${2:?--push-key needs a file}"); shift ;;
 	--github-keys) GITHUB_USERS+=("${2:?--github-keys needs a GitHub user name}"); GIVEN+="github "; shift ;;
+	--github-sync) GITHUB_SYNC=1; GIVEN+="github_sync " ;;
 	--deny-force-push) DENY_FORCE_PUSH=1; GIVEN+="deny_force_push " ;;
 	--manage-repos) MANAGE_REPOS=1; GIVEN+="manage_repos " ;;
 	--self-update) SELF_UPDATE=1; GIVEN+="self_update " ;;
@@ -309,6 +322,7 @@ while (($#)); do
 	--tailscale-key) TS_KEY_FILE=${2:?--tailscale-key needs a file}; TAILSCALE=1; GIVEN+="tailscale "; shift ;;
 	--admin-user) ADMIN_USER=${2:?--admin-user needs a user name}; GIVEN+="admin_user "; shift ;;
 	--admin-key) ADMIN_KEY=${2:?--admin-key needs a file}; shift ;;
+	--admin-github) ADMIN_GITHUB=${2:?--admin-github needs a GitHub user name}; GIVEN+="admin_github "; shift ;;
 	--admin-password-hash) ADMIN_PW_HASH=${2:?--admin-password-hash needs a file}; shift ;;
 	--undo-ssh-hardening) UNDO_SSH=1 ;;
 	--uninstall) UNINSTALL=1 ;;
@@ -353,8 +367,12 @@ if [[ -n $ADMIN_USER ]]; then
 	[[ $ADMIN_USER =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "--admin-user: '$ADMIN_USER' isn't a valid user name"
 	case $ADMIN_USER in root | "$GIT_USER" | "$SERVICE_USER") die "--admin-user can't be $ADMIN_USER" ;; esac
 fi
-[[ -z $ADMIN_KEY && -z $ADMIN_PW_HASH ]] || [[ -n $ADMIN_USER ]] ||
-	die "--admin-key and --admin-password-hash go with --admin-user"
+[[ -z $ADMIN_KEY && -z $ADMIN_PW_HASH && -z $ADMIN_GITHUB ]] || [[ -n $ADMIN_USER ]] ||
+	die "--admin-key, --admin-github and --admin-password-hash go with --admin-user"
+[[ -z $ADMIN_GITHUB || $ADMIN_GITHUB =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]] ||
+	die "--admin-github: '$ADMIN_GITHUB' isn't a GitHub user name"
+((GITHUB_SYNC && ${#GITHUB_USERS[@]} == 0)) && [[ -z $ADMIN_GITHUB ]] &&
+	die "--github-sync goes with --github-keys or --admin-github"
 [[ -z $ADMIN_KEY || -r $ADMIN_KEY ]] || die "--admin-key: can't read $ADMIN_KEY"
 for u in "${SSH_ALLOW[@]}"; do
 	[[ $u =~ ^[a-z_][a-z0-9_.-]*$ ]] || die "--ssh-allow: '$u' isn't a user name"
@@ -438,6 +456,7 @@ if ((DEPLOY)); then
 	title=
 	set_clone=0
 	set_about=0
+	set_signers=0
 	admin_hash=
 	proceed=0
 	# shellcheck disable=SC2329 # run by the EXIT trap
@@ -516,6 +535,10 @@ if ((DEPLOY)); then
 				"${saved[github]:-none}"
 			[[ $gh == none ]] || read -ra GITHUB_USERS <<<"${gh//,/ }"
 		fi
+		if ((${#GITHUB_USERS[@]})) && ! given github_sync; then
+			ask_yn GITHUB_SYNC "Keep them in sync (the server checks GitHub every 15 minutes, so keys added or removed there count without deploying again)" \
+				"${saved[github_sync]:-1}"
+		fi
 		push_files=("${PUSH_KEYS[@]}")
 		if ((${#GITHUB_USERS[@]})); then
 			GH_KEYS=$(mktemp)
@@ -584,6 +607,21 @@ if ((DEPLOY)); then
 				ADMIN_USER=$remote_user
 			fi
 		fi
+		if [[ -n $ADMIN_USER ]] && ! given admin_github; then
+			ask ADMIN_GITHUB "GitHub user whose SSH keys can also log in as $ADMIN_USER (none: no)" \
+				"${saved[admin_github]:-none}"
+			[[ $ADMIN_GITHUB == none ]] && ADMIN_GITHUB=
+			if [[ -n $ADMIN_GITHUB ]]; then
+				# Fetched here too, so a typo stops the run before anything is uploaded.
+				gh_check=$(mktemp)
+				github_keys "$ADMIN_GITHUB" "$gh_check"
+				rm -f "$gh_check"
+				if ((${#GITHUB_USERS[@]} == 0)) && ! given github_sync; then
+					ask_yn GITHUB_SYNC "Keep them in sync (the server checks GitHub every 15 minutes)" \
+						"${saved[github_sync]:-1}"
+				fi
+			fi
+		fi
 		admin_exists=0
 		if [[ -n $ADMIN_USER ]] && remote "id -u $(printf %q "$ADMIN_USER")" </dev/null >/dev/null 2>&1; then
 			admin_exists=1
@@ -625,6 +663,12 @@ if ((DEPLOY)); then
 		# The about page's example clone command, while it's the placeholder.
 		about=$CONFIG_DIR/about.md
 		[[ $DOMAIN != git.example.com ]] && grep -qF 'git.example.com' "$about" 2>/dev/null && set_about=1
+		# Signature badges from the same GitHub users' signing keys, while the
+		# config doesn't name GitHub users for that itself.
+		if ((${#GITHUB_USERS[@]})) && ! grep -Eq '^[[:space:]]*(\[signatures\.github\]|github[[:space:]]*=)' "$cfg"; then
+			ask_yn set_signers "Show their commits and tags signed with an SSH signing key they keep on GitHub as verified" \
+				"${saved[signers]:-1}"
+		fi
 	fi
 	check_options
 
@@ -637,6 +681,11 @@ if ((DEPLOY)); then
 		[[ -n $EMAIL ]] && args+=(--email "$EMAIL")
 		((ANUBIS)) && args+=(--anubis --challenge "$CHALLENGE")
 		((${#PUSH_KEYS[@]})) && args+=(--push-key push-keys.pub)
+		# In sync, the server fetches them itself from now on.
+		if ((GITHUB_SYNC)); then
+			for u in "${GITHUB_USERS[@]}"; do args+=(--github-keys "$u"); done
+			args+=(--github-sync)
+		fi
 		((DENY_FORCE_PUSH)) && args+=(--deny-force-push)
 		((MANAGE_REPOS)) && args+=(--manage-repos)
 		((SELF_UPDATE)) && args+=(--update-from "$UPDATE_FROM")
@@ -644,6 +693,7 @@ if ((DEPLOY)); then
 		((TAILSCALE)) && args+=(--tailscale)
 		[[ -n $ADMIN_USER ]] && args+=(--admin-user "$ADMIN_USER")
 		[[ -n $ADMIN_USER && -n $ADMIN_KEY ]] && args+=(--admin-key admin-keys.pub)
+		[[ -n $ADMIN_USER && -n $ADMIN_GITHUB ]] && args+=(--admin-github "$ADMIN_GITHUB")
 		for u in "${SSH_ALLOW[@]}"; do args+=(--ssh-allow "$u"); done
 	fi
 
@@ -655,10 +705,11 @@ if ((DEPLOY)); then
 		note "site:    https://$DOMAIN$( ((ANUBIS)) && echo " with Anubis ($CHALLENGE)")"
 		push_desc=("${push_files[@]}" "${GITHUB_USERS[@]/#/github.com/}")
 		note "push:    ${push_desc[*]:-nobody (no --push-key)}$( ((DENY_FORCE_PUSH)) && echo ', no force pushes')$( ((MANAGE_REPOS)) && echo ', rename/delete allowed')"
+		((GITHUB_SYNC)) && note "github:  keys kept in sync, checked every 15 minutes"
 		note "harden:  $( ((HARDEN)) && echo yes || echo no)"
 		((SELF_UPDATE)) && note "update:  sudo canopy-update on the server, releases from $UPDATE_FROM"
 		if [[ -n $ADMIN_USER ]]; then
-			note "admin:   $ADMIN_USER$( ((admin_exists)) && echo " (exists)" || echo " (new, with $([[ -n $ADMIN_KEY ]] && echo "the keys in $ADMIN_KEY" || echo "root's SSH keys") and a sudo password)")$( ((HARDEN)) && echo ", root logins off")"
+			note "admin:   $ADMIN_USER$( ((admin_exists)) && echo " (exists)" || echo " (new, with $([[ -n $ADMIN_KEY ]] && echo "the keys in $ADMIN_KEY" || echo "root's SSH keys") and a sudo password)")$([[ -n $ADMIN_GITHUB ]] && echo ", also github.com/$ADMIN_GITHUB's keys")$( ((HARDEN)) && echo ", root logins off")"
 		fi
 		if ((TAILSCALE)); then
 			note "ssh:     only over Tailscale$([[ -n $remote_ts ]] && echo " ($remote_ts)" || echo ", joining with an auth key (not saved)")"
@@ -666,6 +717,7 @@ if ((DEPLOY)); then
 		[[ -n $title ]] && note "config:  title = \"$title\""
 		((set_clone)) && note "config:  [clone] http = \"https://$DOMAIN\""
 		((set_about)) && note "config:  git.example.com -> $DOMAIN in about.md"
+		((set_signers)) && note "config:  [signatures.github] for ${GITHUB_USERS[*]}"
 	fi
 	note "runs:    ./install.sh ${args[*]}$( ((DRY_RUN)) && echo " --dry-run")"
 	ask_yn proceed "Go ahead" 1
@@ -677,6 +729,18 @@ if ((DEPLOY)); then
 			[[ -n $title ]] && note "would set title = \"$title\" in config/canopy.toml"
 			((set_clone)) && note "would set [clone] http = \"https://$DOMAIN\" in config/canopy.toml"
 			((set_about)) && note "would replace git.example.com with $DOMAIN in config/about.md"
+			((set_signers)) && note "would add [signatures.github] for ${GITHUB_USERS[*]} to config/canopy.toml"
+		fi
+		if ((set_signers && !DRY_RUN)); then
+			{
+				echo
+				echo "# Added by install.sh: commits and tags signed with an SSH signing key"
+				echo "# these GitHub users keep on GitHub show as verified. canopy fetches the"
+				echo "# keys itself, every hour. Badge name = GitHub user."
+				echo "[signatures.github]"
+				for u in "${GITHUB_USERS[@]}"; do printf '"%s" = "%s"\n' "$u" "$u"; done
+			} >>"$cfg"
+			note "added [signatures.github] for ${GITHUB_USERS[*]} to config/canopy.toml"
 		fi
 		if [[ -n $title ]] && ((!DRY_RUN)); then
 			sed "s|^title = \"git\"\$|title = \"$title\"|" "$cfg" >"$cfg.tmp" && mv "$cfg.tmp" "$cfg"
@@ -700,6 +764,9 @@ if ((DEPLOY)); then
 				echo "challenge=$CHALLENGE"
 				echo "push_keys=$(IFS=,; echo "${push_files[*]:-none}")"
 				echo "github=$(IFS=,; echo "${GITHUB_USERS[*]:-none}")"
+				echo "github_sync=$GITHUB_SYNC"
+				echo "signers=$set_signers"
+				echo "admin_github=${ADMIN_GITHUB:-none}"
 				echo "deny_force_push=$DENY_FORCE_PUSH"
 				echo "manage_repos=$MANAGE_REPOS"
 				echo "self_update=$SELF_UPDATE"
@@ -1016,7 +1083,9 @@ if ((UNINSTALL)); then
 	say "Removing canopy"
 	run systemctl disable --now canopy.service 2>/dev/null || true
 	run systemctl disable --now canopy-mirror.timer 2>/dev/null || true
+	run systemctl disable --now canopy-github-keys.timer 2>/dev/null || true
 	run rm -f "$UNIT" "$MIRROR_UNIT" "$MIRROR_TIMER" "$BIN"
+	run rm -f "$GH_SYNC_UNIT" "$GH_SYNC_TIMER" "$GH_SYNC_CMD" "$GH_SYNC_CONF"
 	run rm -rf "$CACHE"
 	if [[ -e $UPDATE_CMD || -e $UPDATE_LIB ]]; then
 		say "Removing canopy-update and its Go"
@@ -2257,8 +2326,33 @@ if [[ -n $ADMIN_USER ]]; then
 			run install -d -m 0700 -o "$ADMIN_USER" -g "$admin_group" "$admin_home/.ssh"
 			printf '%s\n' "$keys" | write "$admin_keys" 0600
 			run chown "$ADMIN_USER:$admin_group" "$admin_keys"
-		else
+		elif [[ -z $ADMIN_GITHUB ]]; then
 			note "no SSH keys found in $src; $ADMIN_USER can't log in over SSH yet (--admin-key FILE)"
+		fi
+	fi
+
+	# --admin-github: that GitHub user's keys as well, each labelled
+	# github:USER, which tells canopy-github-keys which lines are its own to
+	# replace. Without it, keys an earlier run took from GitHub go, as long as
+	# others are left to log in with.
+	gh_lines='[[:space:]]github:[A-Za-z0-9-]+$'
+	others=$(grep -Ev "$gh_lines" "$admin_keys" 2>/dev/null || true)
+	if [[ -n $ADMIN_GITHUB ]]; then
+		gh_admin=$(mktemp)
+		github_keys "$ADMIN_GITHUB" "$gh_admin"
+		admin_group=$(id -gn "$ADMIN_USER" 2>/dev/null || echo "$ADMIN_USER")
+		run install -d -m 0700 -o "$ADMIN_USER" -g "$admin_group" "$admin_home/.ssh"
+		printf '%s\n' "$others" | cat - "$gh_admin" | grep -E '^(ssh-|ecdsa-|sk-)' |
+			awk '!seen[$1 " " $2]++' | write "$admin_keys" 0600
+		run chown "$ADMIN_USER:$admin_group" "$admin_keys"
+		rm -f "$gh_admin"
+	elif grep -Eq "$gh_lines" "$admin_keys" 2>/dev/null; then
+		if grep -Eq '^(ssh-|ecdsa-|sk-)' <<<"$others"; then
+			note "removing the keys taken from GitHub (no --admin-github any more)"
+			printf '%s\n' "$others" | write "$admin_keys" 0600
+			run chown "$ADMIN_USER:$(id -gn "$ADMIN_USER" 2>/dev/null || echo "$ADMIN_USER")" "$admin_keys"
+		else
+			note "keeping the keys taken from GitHub: $ADMIN_USER has no others (--admin-key FILE)"
 		fi
 	fi
 
@@ -2296,6 +2390,155 @@ if [[ -n $ADMIN_USER ]]; then
 	fi
 	# The hardening's AllowUsers list must include it.
 	SSH_ALLOW+=("$ADMIN_USER")
+fi
+
+# ---------------------------------------------------------------------------
+# --github-sync: canopy-github-keys fetches the keys of the GitHub users
+# named with --github-keys and --admin-github every 15 minutes, and puts them
+# where they let in: $GIT_KEYS for pushes, the admin's authorized_keys for
+# logins. It only replaces the lines labelled github:USER, so keys from
+# --push-key and --admin-key stay. When GitHub can't be reached, nothing
+# changes; a key removed on GitHub stops working at the next check.
+
+if ((GITHUB_SYNC)); then
+	say "Keeping the keys from GitHub in sync"
+	{
+		echo "# Written by install.sh: the GitHub users whose keys $GH_SYNC_CMD follows."
+		echo "# push USER: may push; admin ACCOUNT USER: may log in as ACCOUNT."
+		if ((${#PUSH_KEYS[@]})); then
+			for u in "${GITHUB_USERS[@]}"; do echo "push $u"; done
+		fi
+		[[ -n $ADMIN_GITHUB ]] && echo "admin $ADMIN_USER $ADMIN_GITHUB"
+	} | write "$GH_SYNC_CONF" 0644
+	{
+		cat <<EOF
+#!/usr/bin/env bash
+# canopy-github-keys, written by install.sh: fetches the SSH keys of the
+# GitHub users in $GH_SYNC_CONF (https://github.com/USER.keys) and
+# replaces the lines labelled github:USER with them: in $GIT_KEYS
+# (pushes) and in an admin account's authorized_keys (logins). Other lines
+# stay. A file is left alone when any of its users can't be fetched, and an
+# admin's keys are never emptied, which would lock the account out.
+set -euo pipefail
+conf=$GH_SYNC_CONF
+git_keys=$GIT_KEYS
+EOF
+		cat <<'EOF'
+status=0
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# fetch USER: print USER's valid keys, labelled github:USER, or fail. A user
+# GitHub doesn't have (any more) has none.
+fetch() {
+	local user=$1 code line
+	[[ $user =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]] || { echo "$conf: '$user' isn't a GitHub user name" >&2; return 1; }
+	code=$(curl -sS --max-time 20 --proto =https -o "$tmp/body" -w '%{http_code}' "https://github.com/$user.keys") ||
+		{ echo "github.com/$user: couldn't connect" >&2; return 1; }
+	case $code in
+	200) ;;
+	404) echo "github.com/$user: no such user; none of its keys count" >&2; return 0 ;;
+	*) echo "github.com/$user: HTTP $code" >&2; return 1 ;;
+	esac
+	while IFS= read -r line; do
+		line=${line%$'\r'}
+		[[ $line =~ ^(ssh-|ecdsa-|sk-) ]] || continue
+		ssh-keygen -l -f /dev/stdin <<<"$line" >/dev/null 2>&1 || continue
+		read -r type blob _ <<<"$line"
+		printf '%s %s github:%s\n' "$type" "$blob" "$user"
+	done <"$tmp/body"
+}
+
+# update FILE PREFIX MIN USER...: replace FILE's github: lines with the keys
+# of USER..., each line starting with PREFIX, keeping each key once. With MIN
+# set, refuse to leave FILE without any key.
+update() {
+	local file=$1 prefix=$2 min=$3 user lines new next
+	shift 3
+	[[ -L $file || -L $(dirname "$file") ]] && { echo "$file: a symbolic link; not touching it" >&2; return 1; }
+	[[ -f $file ]] || { echo "$file: missing; run install.sh again" >&2; return 1; }
+	lines=
+	for user in "$@"; do
+		lines+=$(fetch "$user") || { echo "$file: unchanged" >&2; return 1; }
+		lines+=$'\n'
+	done
+	new=$({ grep -Ev '[[:space:]]github:[A-Za-z0-9-]+$' "$file" 2>/dev/null || true
+		printf '%s' "$lines" | sed "/./s/^/$prefix/"; } |
+		awk '{ k = $0; sub(/^restrict /, "", k); split(k, f, " ") }
+			/^[^#]/ && seen[f[1] " " f[2]]++ { next } NF { print }')
+	if ((min)) && ! grep -Eq '(^|[[:space:]])(ssh-|ecdsa-|sk-)' <<<"$new"; then
+		echo "$file: GitHub lists no keys; keeping the ones it has, so the account isn't locked out" >&2
+		return 0
+	fi
+	[[ $(cat "$file") == "$new" ]] && return 0
+	# A new file (mktemp makes it, so nothing planted there is followed),
+	# renamed over the old one with its owner and mode.
+	next=$(mktemp "$file.XXXXXX")
+	printf '%s\n' "$new" >"$next"
+	chown --reference="$file" "$next"
+	chmod --reference="$file" "$next"
+	mv -fT "$next" "$file"
+	echo "$file: $(grep -c 'github:' <<<"$new" || true) key(s) from GitHub"
+}
+
+push=()
+declare -A admins=()
+while read -r kind a b; do
+	case $kind in
+	push) push+=("$a") ;;
+	admin) admins[$a]+="$b " ;;
+	esac
+done < <(grep -v '^#' "$conf")
+
+if ((${#push[@]})); then
+	update "$git_keys" "restrict " 0 "${push[@]}" || status=1
+fi
+for account in "${!admins[@]}"; do
+	home=$(getent passwd "$account" | cut -d: -f6) || { echo "no account $account" >&2; status=1; continue; }
+	read -ra users <<<"${admins[$account]}"
+	update "$home/.ssh/authorized_keys" "" 1 "${users[@]}" || status=1
+done
+exit $status
+EOF
+	} | write "$GH_SYNC_CMD" 0755
+	admin_rw=
+	[[ -n $ADMIN_GITHUB ]] && admin_rw=" -$admin_home/.ssh"
+	write "$GH_SYNC_UNIT" 0644 <<EOF
+[Unit]
+Description=Fetch the SSH keys canopy takes from GitHub ($GH_SYNC_CONF)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$GH_SYNC_CMD
+# It only writes the key files.
+CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE
+ProtectSystem=strict
+ReadWritePaths=-$(dirname "$GIT_KEYS")$admin_rw
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+$SANDBOX
+EOF
+	write "$GH_SYNC_TIMER" 0644 <<EOF
+[Unit]
+Description=Fetch the SSH keys canopy takes from GitHub every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+RandomizedDelaySec=1min
+
+[Install]
+WantedBy=timers.target
+EOF
+	run systemctl daemon-reload
+	run systemctl enable --now canopy-github-keys.timer
+	note "checks GitHub every 15 minutes: journalctl -u canopy-github-keys"
+elif [[ -f $GH_SYNC_TIMER ]]; then
+	say "No --github-sync any more: the keys from GitHub stay as they are now"
+	run systemctl disable --now canopy-github-keys.timer
+	run rm -f "$GH_SYNC_UNIT" "$GH_SYNC_TIMER" "$GH_SYNC_CMD" "$GH_SYNC_CONF"
+	run systemctl daemon-reload
 fi
 
 # ---------------------------------------------------------------------------

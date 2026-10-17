@@ -28,6 +28,7 @@ import (
 
 	"spinney.dev/canopy/internal/config"
 	"spinney.dev/canopy/internal/fonts"
+	"spinney.dev/canopy/internal/ghkeys"
 	"spinney.dev/canopy/internal/git"
 	"spinney.dev/canopy/internal/render"
 	"spinney.dev/canopy/internal/sigcheck"
@@ -57,8 +58,9 @@ type Server struct {
 	activityMu    sync.Mutex
 	activityCache *activityData // what activity pages are cut from, read once a minute at most
 
-	keys    *sigcheck.Keys // [signatures]; nil turns the badges off
 	sigMu   sync.Mutex
+	keys    *sigcheck.Keys             // [signatures]; nil turns the badges off
+	keysGen int                        // counts changes to keys (GitHub's), for ETags
 	sigSeen map[string]sigcheck.Result // by object hash, which pins the contents
 }
 
@@ -94,11 +96,21 @@ func New(cfg *config.Config) (*Server, error) {
 		started:       time.Now(),
 		description:   render.Inline(cfg.Description),
 	}
-	if len(cfg.Signatures.Keys) > 0 {
-		if s.keys, err = sigcheck.NewKeys(cfg.Signatures.Keys); err != nil {
+	if len(cfg.Signatures.Keys) > 0 || len(cfg.Signatures.GitHub) > 0 {
+		listed, err := sigcheck.NewKeys(cfg.Signatures.Keys)
+		if err != nil {
 			return nil, fmt.Errorf("signatures: keys: %w", err)
 		}
+		s.keys = listed
 		s.sigSeen = map[string]sigcheck.Result{}
+		// GitHub's keys are followed in the background; until they arrive
+		// (or come from the cache), only the listed ones count.
+		if len(cfg.Signatures.GitHub) > 0 {
+			signers := ghkeys.NewSigners(ghkeys.CacheDir(), cfg.Signatures.GitHub)
+			go signers.Run(context.Background(), time.Hour, func(byName map[string][]string) {
+				s.setKeys(listed.Merge(byName))
+			})
+		}
 	}
 	css, _ := assets.ReadFile("static/style.css")
 	sum := sha256.Sum256(slices.Concat(css, s.chroma, s.theme))
@@ -327,8 +339,11 @@ func (s *Server) pageNotModified(w http.ResponseWriter, r *http.Request, repo *R
 	if err != nil {
 		return false // the page itself will report it
 	}
+	s.sigMu.Lock()
+	keysGen := s.keysGen
+	s.sigMu.Unlock()
 	parts := []string{s.version, strconv.FormatInt(s.started.UnixNano(), 10), r.URL.RequestURI(), state,
-		repo.Description, repo.Homepage, repo.Maintainer}
+		repo.Description, repo.Homepage, repo.Maintainer, strconv.Itoa(keysGen)}
 	if repo.Upstream != "" {
 		synced, failure := repo.SyncStatus(ctx)
 		parts = append(parts, strconv.FormatInt(synced.Unix(), 10), failure)
@@ -471,12 +486,14 @@ const maxSigSeen = 100000
 // badges. It returns nil when [signatures] is off or the objects can't be
 // read, and pages then show no badges.
 func (s *Server) signatures(ctx context.Context, repo *Repo, hashes []string) map[string]sigcheck.Result {
-	if s.keys == nil {
-		return nil
-	}
 	found := map[string]sigcheck.Result{}
 	var todo []string
 	s.sigMu.Lock()
+	keys := s.keys
+	if keys == nil {
+		s.sigMu.Unlock()
+		return nil
+	}
 	for _, h := range hashes {
 		if res, ok := s.sigSeen[h]; ok {
 			found[h] = res
@@ -499,11 +516,23 @@ func (s *Server) signatures(ctx context.Context, repo *Repo, hashes []string) ma
 		clear(s.sigSeen)
 	}
 	for h, raw := range objects {
-		res := s.keys.Object(raw, len(h) == 64)
+		res := keys.Object(raw, len(h) == 64)
 		found[h] = res
-		s.sigSeen[h] = res
+		// Results under keys replaced meanwhile aren't remembered.
+		if s.keys == keys {
+			s.sigSeen[h] = res
+		}
 	}
 	return found
+}
+
+// setKeys replaces the trusted keys, forgetting what the old ones said.
+func (s *Server) setKeys(keys *sigcheck.Keys) {
+	s.sigMu.Lock()
+	defer s.sigMu.Unlock()
+	s.keys = keys
+	s.keysGen++
+	clear(s.sigSeen)
 }
 
 func (s *Server) cloneURL(r *http.Request, repo *Repo) string {

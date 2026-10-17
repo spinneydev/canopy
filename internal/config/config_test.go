@@ -114,11 +114,17 @@ func TestSignaturesAreChecked(t *testing.T) {
 	if _, err := Load(writeConfig(t, dir, ok)); err != nil {
 		t.Fatalf("%s: %v", ok, err)
 	}
+	if _, err := Load(writeConfig(t, dir, "[signatures.github]\nAlice = \"alice-gh\"\n")); err != nil {
+		t.Fatalf("github: %v", err)
+	}
 	twice := "[signatures.keys]\nalice = [\"" + key + "\"]\nbob = [\"" + key + "\"]"
 	for body, want := range map[string]string{
 		"[signatures.keys]\nalice = [\"ssh-ed25519 AAAA\"]": "isn't an SSH public key",
-		twice:                    "is listed under",
-		"[signatures]\nkey = []": "unknown keys",
+		twice:                                      "is listed under",
+		"[signatures]\nkey = []":                   "unknown keys",
+		"[signatures.github]\nalice = \"../x\"":    "isn't a GitHub user name",
+		"[signatures.github]\nalice = \"-alice\"":  "isn't a GitHub user name",
+		"[signatures.github]\nalice = [\"alice\"]": "",
 	} {
 		_, err := Load(writeConfig(t, dir, body+"\n"))
 		if err == nil || !strings.Contains(err.Error(), want) {

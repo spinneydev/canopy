@@ -240,7 +240,26 @@ If your keys are on GitHub, you can skip copying them: give your GitHub user
 name when asked "Also allow the SSH keys of GitHub users to push" (or pass
 `--github-keys USER`). Each deploy fetches `https://github.com/USER.keys`
 again, so a key added to or removed from GitHub counts from the next deploy.
-Anyone who can add keys to that GitHub account can then push here too. With Tailscale, the new machine must also be in the tailnet (and
+Answer yes to "Keep them in sync" (`--github-sync`) and you needn't deploy
+at all: the server checks GitHub every 15 minutes, so a new laptop's key
+works a quarter of an hour after you add it on GitHub, and a key you remove
+there stops working as soon. If GitHub can't be reached, the keys stay as
+they were. Anyone who can add keys to that GitHub account can then push here
+too.
+
+The same works for logging in to the server: "GitHub user whose SSH keys can
+also log in as alice" (`--admin-github USER`) adds that user's GitHub keys to
+the admin account, and with `--github-sync` keeps them current. sudo still
+asks for the account's password. The sync never takes the account's last key
+away (that would lock you out); keys from `--admin-key` always stay.
+
+And for signature badges: answer yes to "Show their commits and tags signed
+with an SSH signing key they keep on GitHub as verified" and the deploy adds
+`[signatures.github]` to `config/canopy.toml` (see
+[config/README.md](config/README.md#signatures)). On GitHub, add the key a
+second time under **Settings → SSH and GPG keys → New SSH key** with
+**Key type: Signing Key**; a key added only for authentication doesn't
+count. With Tailscale, the new machine must also be in the tailnet (and
 allowed by your tailnet's access rules) before it can reach SSH.
 
 Anyone whose key is on the list can push to every repository and create new
