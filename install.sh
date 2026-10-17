@@ -2408,7 +2408,11 @@ if ((GITHUB_SYNC)); then
 		if ((${#PUSH_KEYS[@]})); then
 			for u in "${GITHUB_USERS[@]}"; do echo "push $u"; done
 		fi
-		[[ -n $ADMIN_GITHUB ]] && echo "admin $ADMIN_USER $ADMIN_GITHUB"
+		# An if, not &&: a false test ending the group would fail the
+		# pipeline (pipefail) and stop the install here, with no message.
+		if [[ -n $ADMIN_GITHUB ]]; then
+			echo "admin $ADMIN_USER $ADMIN_GITHUB"
+		fi
 	} | write "$GH_SYNC_CONF" 0644
 	{
 		cat <<EOF
