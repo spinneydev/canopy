@@ -15,6 +15,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,8 +47,9 @@ var forcedConfig = [][2]string{
 	{"core.hooksPath", "/dev/null"},
 }
 
-// Env returns the environment every git invocation runs with.
-func Env() []string {
+// Env returns the environment every git invocation runs with, with extra
+// settings after the forced ones.
+func Env(extra ...[2]string) []string {
 	env := []string{}
 	for _, kv := range os.Environ() {
 		if strings.HasPrefix(kv, "GIT_") {
@@ -55,9 +57,10 @@ func Env() []string {
 		}
 		env = append(env, kv)
 	}
+	config := slices.Concat(forcedConfig, extra)
 	env = append(env, "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0",
-		"GIT_CONFIG_COUNT="+strconv.Itoa(len(forcedConfig)))
-	for i, kv := range forcedConfig {
+		"GIT_CONFIG_COUNT="+strconv.Itoa(len(config)))
+	for i, kv := range config {
 		env = append(env,
 			fmt.Sprintf("GIT_CONFIG_KEY_%d=%s", i, kv[0]),
 			fmt.Sprintf("GIT_CONFIG_VALUE_%d=%s", i, kv[1]))
@@ -221,7 +224,8 @@ func unix(s string) time.Time {
 func (r *Repo) Log(ctx context.Context, rev, path string, skip, n int) ([]*Commit, error) {
 	args := []string{"log", commitFormat, "--skip=" + strconv.Itoa(skip), "-n", strconv.Itoa(n), rev, "--"}
 	if path != "" {
-		args = append(args, path)
+		// A path, not a pattern: "a*" is that file alone, and ":x" isn't x.
+		args = append(args, ":(literal)"+path)
 	}
 	out, err := r.run(ctx, args...)
 	if err != nil {

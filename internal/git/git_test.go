@@ -194,6 +194,46 @@ func TestLastCommits(t *testing.T) {
 	}
 }
 
+// TestLogOfAPath: a file's history is that file's alone, also when its name
+// is a pattern to git (a*) or looks like pathspec magic (:x).
+func TestLogOfAPath(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	// Windows can't have these names as files, so the commits are made from
+	// trees.
+	dir := t.TempDir()
+	gitIn(t, dir, "", "init", "-q", "--bare")
+	blob := gitIn(t, dir, "x\n", "hash-object", "-w", "--stdin")
+	var entries, parent string
+	commit := func(msg string, names ...string) {
+		for _, n := range names {
+			entries += "100644 blob " + blob + "\t" + n + "\n"
+		}
+		args := []string{"commit-tree", gitIn(t, dir, entries, "mktree"), "-m", msg}
+		if parent != "" {
+			args = append(args, "-p", parent)
+		}
+		parent = gitIn(t, dir, "", args...)
+	}
+	commit("add a* and :x", "a*", ":x")
+	commit("add ab", "ab")
+	commit("add x", "x")
+
+	ctx := context.Background()
+	r := &Repo{Dir: dir}
+	for path, want := range map[string]string{"a*": "add a* and :x", ":x": "add a* and :x", "ab": "add ab", "x": "add x"} {
+		commits, err := r.Log(ctx, parent, path, 0, 10)
+		var got []string
+		for _, c := range commits {
+			got = append(got, c.Message)
+		}
+		if err != nil || len(got) != 1 || got[0] != want {
+			t.Errorf("Log(%q) = %q, %v; want only %q", path, got, err, want)
+		}
+	}
+}
+
 func TestResolveCommitRefusesSpecialRevisions(t *testing.T) {
 	r := &Repo{Dir: t.TempDir()}
 	for _, rev := range []string{"", "--help", "-n", ":/fix", "main@{1}", "HEAD@{yesterday}", "main^{/fix}", "HEAD~2^{/x}", "a\nb"} {

@@ -117,7 +117,7 @@ and tag pages), like GitHub's. Off until a key is listed.
 | key | default | meaning |
 |---|---|---|
 | `keys` | none | Trusted SSH public keys, by the name shown on the badge: `name = ["ssh-ed25519 AAAA… comment", …]`, one key per entry, as in `authorized_keys` but without options. |
-| `github` | none | GitHub users whose SSH signing keys are trusted too, by the name shown on the badge: `name = "github-user"`. canopy fetches them from GitHub's API when it starts and every hour after, and keeps the last ones in its cache folder, so a restart while GitHub is unreachable keeps them. Only keys added on GitHub as a **Signing Key** count, not those for logging in. A key listed under `keys` keeps that name. |
+| `github` | none | GitHub users whose SSH signing keys are trusted too, by the name shown on the badge: `name = "github-user"`. canopy fetches them from GitHub's API when it starts and every hour after, and keeps the last ones in its cache folder, so a restart while GitHub is unreachable keeps them. The first time, it also keeps the ID of the account the name belongs to, and from then on follows that account: a rename on GitHub changes nothing, and someone who registers a name its owner gave up gets no badges. Only keys added on GitHub as a **Signing Key** count, not those for logging in. A key listed under `keys` keeps that name. |
 
 ```toml
 [signatures.keys]

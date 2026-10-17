@@ -75,6 +75,13 @@ command that changes a repository, and it has no accounts or sessions.
 - **Cloning is fetch-only.** Smart HTTP goes through `git http-backend`
   with upload-pack only; `git-receive-pack` over HTTP is never routed, so
   nobody can push over HTTPS, with or without credentials.
+- **Clones get what the pages show.** A clone lists the branches and tags
+  only (`uploadpack.hideRefs`), and can fetch only what they lead to. git's
+  protocol v2 would hand out any object a client names by its hash, a
+  commit force-pushed over included, so canopy drops the `Git-Protocol`
+  header (under any spelling CGI would pass on) and http-backend speaks v0,
+  which checks. A repository's own `uploadpack.allowAnySHA1InWant` (and its
+  tip and reachable variants) is switched off.
 - **No scripts.** Every page is sent with
   `Content-Security-Policy: default-src 'none'; style-src 'self'; font-src 'self'; img-src * data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
   plus `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`.
@@ -104,7 +111,7 @@ command that changes a repository, and it has no accounts or sessions.
   full commit hash that is used from then on. That commit must be on a
   branch or a tag: one that was force-pushed over, or left by a deleted
   branch, stays in the repository until `git gc` removes it, but no page,
-  file or archive shows it, by its full hash or a short one.
+  file, archive or clone shows it, by its full hash or a short one.
 - **Paths stay inside the repository.** File paths are passed to git as
   tree paths of a resolved commit, never as file system paths.
 - **A repository's config can't run programs.** canopy reads repositories
@@ -155,7 +162,8 @@ else the last address in `X-Forwarded-For` that isn't on the local network,
 and IPv6 addresses count by their /64. A proxy that sends neither has its
 requests limited by the pools alone, as one visitor can't be told from
 another. Other addresses are never read from headers, so a visitor can't
-pass for someone else by sending one.
+pass for someone else by sending one. The Caddy that install.sh sets up
+writes `X-Real-IP` itself, with Anubis or without, over any a visitor sends.
 
 ## The push side: the `git` account
 
@@ -173,15 +181,23 @@ Pushes arrive over SSH as the `git` account, which is built to do one thing:
   the account can't add keys for itself. Only the keys given with
   `--push-key`, and those fetched from GitHub with `--github-keys` at
   install time, are there.
+- **GitHub accounts are followed by their ID, not their name.** A name
+  can change hands: renaming or deleting an account frees it for anyone to
+  register. The first time a name is given with `--github-keys` or
+  `--admin-github`, the installer keeps the ID of the account it names in
+  `/etc/canopy/github-ids`, and from then on takes the keys of that
+  account, whatever it is called by then (`api.github.com/user/ID`). Someone
+  who registers a freed name gets nothing. An account that is gone stops
+  the next install; the sync removes its keys.
 - **With `--github-sync`**, `canopy-github-keys` (a root systemd timer,
-  every 15 minutes) fetches `https://github.com/USER.keys` again for the
-  users named with `--github-keys` and `--admin-github`, and replaces only
-  the lines labelled `github:USER`. Whoever controls those GitHub accounts
-  controls who can push (and, with `--admin-github`, log in as the admin
-  account; sudo still needs its password). Every key is checked with
-  `ssh-keygen` and gets the same `restrict` as the others. A failed fetch
-  changes nothing; a user GitHub answers 404 for loses its keys (a deleted
-  account's name can be registered again by someone else). An admin account
+  every 15 minutes) fetches the keys of those accounts again and replaces
+  only the lines labelled `github:USER`. Whoever controls those GitHub
+  accounts controls who can push (and, with `--admin-github`, log in as the
+  admin account; sudo still needs its password). Every key is checked with
+  `ssh-keygen` and gets the same `restrict` as the others. The other lines
+  stay as they are, options included, and a key that is already there isn't
+  added a second time, which without its options would undo a `from=` or
+  `command=` on the first. A failed fetch changes nothing. An admin account
   is never left without a key. The new file is made with `mktemp` and
   renamed into place, so a link planted in `~/.ssh` isn't followed.
 - **Every login goes through `serve`** (sshd `ForceCommand`). On a push to a
@@ -327,7 +343,11 @@ each value back and says if something else set it differently.
 ## How this is tested
 
 - `go test ./...` includes security regression tests: a repository whose
-  config tries to run commands, special revision syntax, path handling.
+  config tries to run commands, special revision syntax, path handling,
+  clones asking for commits no branch holds. On Linux it also runs
+  install.sh's deploy and install as dry runs, with fakes for ssh and
+  GitHub, and its `canopy-github-keys` through a rename and a name taken
+  over.
 - The installer is tested in systemd containers on Debian 13, Ubuntu 24.04
   and 26.04, and Fedora 44: install, re-run, hardening, firewall probes from
   a second container, the lockout guard and rollback, and pushing through
@@ -348,8 +368,6 @@ on Fedora, and the newer features (above) on the other distributions.
 - If the server drops off the tailnet (node key expiry, a Tailscale outage,
   a removed machine), SSH is only reachable through the provider's console.
   Disable key expiry for the server, or use a tagged key.
-- A commit that was removed from every branch can still be opened by its
-  full hash until `git gc` runs.
 - Images in READMEs may load from other sites, which then see visitors'
   IP addresses.
 - The firewall step only manages the default firewalld zone (plus the

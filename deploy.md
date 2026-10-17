@@ -363,7 +363,7 @@ in the tailnet before closing the first session.
 | `--no-caddy` | no Caddy even with `--domain` |
 | `--anubis`, `--challenge nojs\|pow` | Anubis in front of canopy, and its browser check |
 | `--push-key FILE` | keys allowed to push (repeatable; replaces the list) |
-| `--github-keys USER` | also allow USER's keys from `https://github.com/USER.keys` (repeatable; fetched on every run) |
+| `--github-keys USER` | also allow USER's keys from `https://github.com/USER.keys` (repeatable; fetched on every run, by the server, from the account the name belonged to the first time: see [usage.md](usage.md)) |
 | `--github-sync` | fetch the GitHub keys (`--github-keys`, `--admin-github`) again every 15 minutes on the server (`canopy-github-keys.timer`), so changes on GitHub count without a deploy |
 | `--deny-force-push` | refuse pushes that rewrite or delete branches |
 | `--manage-repos` | let push keys `rename` and `delete` repositories over SSH (off: a stolen key could erase one) |

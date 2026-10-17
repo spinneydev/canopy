@@ -64,6 +64,7 @@ BINARY=
 PUSH_KEYS=()
 GITHUB_USERS=() # GitHub users whose public keys may push too
 GH_KEYS=        # temporary file with the keys fetched from GitHub
+declare -A GH_ID=() # GitHub user, in lower case → the account it named first (github_account)
 GITHUB_SYNC=0   # fetch the GitHub keys again every 15 minutes (canopy-github-keys)
 DENY_FORCE_PUSH=0
 MANAGE_REPOS=0  # let push keys rename and delete repositories
@@ -96,6 +97,7 @@ MIRROR_UNIT=/etc/systemd/system/canopy-mirror.service
 MIRROR_TIMER=/etc/systemd/system/canopy-mirror.timer
 GH_SYNC_CMD=/usr/local/sbin/canopy-github-keys
 GH_SYNC_CONF=/etc/canopy/github-keys.conf # the GitHub users it follows
+GH_IDS=/etc/canopy/github-ids # the GitHub accounts behind the names given, by ID
 GH_SYNC_UNIT=/etc/systemd/system/canopy-github-keys.service
 GH_SYNC_TIMER=/etc/systemd/system/canopy-github-keys.timer
 UPDATE_CMD=/usr/local/sbin/canopy-update
@@ -187,7 +189,9 @@ Pushing over SSH:
                        creates it.
   --github-keys USER   also allow pushes from the SSH keys USER has on GitHub
                        (https://github.com/USER.keys); may be repeated. The
-                       keys are fetched on every run.
+                       keys are fetched on every run, from the account the
+                       name belonged to the first time, even once renamed
+                       (kept by its ID in $GH_IDS)
   --github-sync        keep the keys from GitHub (--github-keys and
                        --admin-github) in sync: the server fetches them
                        again every 15 minutes, so a key added to or removed
@@ -281,21 +285,74 @@ write() {
 	mv -fT "$tmp" "$path"
 }
 
-# github_keys <user> <file>: append the SSH keys GitHub lists for user
-# (https://github.com/USER.keys) to file, each labelled github:USER.
+# is_github_user <name>: whether name could be a GitHub user name.
+is_github_user() { [[ $1 =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]]; }
+
+# github_keys <user> <file> [<name>]: append the SSH keys GitHub lists for
+# user (https://github.com/USER.keys) to file, each labelled github:USER.
+# <name> is what the account is called now, if it was renamed since
+# (github_account).
 github_keys() {
-	local user=$1 file=$2 body line
-	[[ $user =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]] ||
-		die "--github-keys: '$user' isn't a GitHub user name"
+	local user=$1 file=$2 name=${3:-$1} body line
+	is_github_user "$user" || die "'$user' isn't a GitHub user name"
 	command -v curl >/dev/null || die "curl is needed to fetch keys from GitHub"
-	body=$(curl -fsSL --max-time 20 "https://github.com/$user.keys" | tr -d '\r') ||
-		die "--github-keys: couldn't fetch https://github.com/$user.keys (no such user, or no network)"
+	body=$(curl -fsSL --max-time 20 "https://github.com/$name.keys" | tr -d '\r') ||
+		die "couldn't fetch https://github.com/$name.keys (no such user, or no network)"
 	body=$(grep -E '^(ssh-|ecdsa-|sk-)' <<<"$body" || true)
-	[[ -n $body ]] || die "--github-keys: $user has no SSH keys on GitHub"
+	[[ -n $body ]] || die "github.com/$name has no SSH keys"
 	while IFS= read -r line; do
 		printf '%s github:%s\n' "$line" "$user"
 	done <<<"$body" >>"$file"
-	note "$(grep -c . <<<"$body") key(s) from github.com/$user"
+	note "$(grep -c . <<<"$body") key(s) from github.com/$name"
+}
+
+# github_account <user>: find the GitHub account to take user's keys from,
+# and set GH_LOGIN to its name now. A name can change hands: renaming or
+# deleting an account frees its name for anyone to register. An ID never
+# does, so the first time a name is given here, the ID of the account it
+# names is kept (GH_ID, saved in $GH_IDS), and later runs follow that
+# account, whatever it is called by then.
+github_account() {
+	local user=$1 id=${GH_ID[${1,,}]:-} url reply code found
+	is_github_user "$user" || die "'$user' isn't a GitHub user name"
+	url=https://api.github.com/users/$user
+	[[ -n $id ]] && url=https://api.github.com/user/$id
+	reply=$(mktemp)
+	code=$(curl -sS --max-time 20 --proto =https -H 'Accept: application/vnd.github+json' \
+		-o "$reply" -w '%{http_code}' "$url") || code=000
+	GH_LOGIN=$(json_field login <"$reply")
+	found=$(json_field id <"$reply")
+	rm -f "$reply"
+	case $code in
+	200) ;;
+	404)
+		[[ -n $id ]] || die "github.com/$user: no such GitHub user"
+		die "github.com/$user: the account that name was first given for (ID $id) no longer exists. If github.com/$user is yours now, remove its line from $GH_IDS and run this again."
+		;;
+	000) die "couldn't reach api.github.com to look up github.com/$user" ;;
+	*) die "couldn't look up github.com/$user: HTTP $code from api.github.com (which allows 60 requests an hour without logging in)" ;;
+	esac
+	is_github_user "$GH_LOGIN" && [[ $found =~ ^[1-9][0-9]*$ ]] ||
+		die "api.github.com's answer for github.com/$user names no account"
+	[[ -z $id || $found == "$id" ]] || die "api.github.com answered for account $found, not $id"
+	GH_ID[${user,,}]=$found
+	[[ ${GH_LOGIN,,} == "${user,,}" ]] || note "github.com/$user is now called $GH_LOGIN (the same account, ID $found)"
+}
+
+# json_field <name>: the first "name": value in the JSON on stdin, a string
+# (without its quotes) or a number, as in GitHub's account objects.
+json_field() {
+	grep -oE "\"$1\": *(\"[^\"]*\"|[0-9]+)" | sed -n '1{s/^"[^"]*": *//; s/^"//; s/"$//; p;}' || true
+}
+
+# load_github_ids: the accounts earlier runs kept in $GH_IDS.
+load_github_ids() {
+	local user id
+	[[ -r $GH_IDS ]] || return 0
+	while read -r user id _; do
+		[[ $user =~ ^[A-Za-z0-9-]+$ && $id =~ ^[1-9][0-9]*$ ]] || continue
+		GH_ID[${user,,}]=$id
+	done <"$GH_IDS"
 }
 
 while (($#)); do
@@ -353,8 +410,11 @@ check_options() {
 [[ -z $DOMAIN || $DOMAIN =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] ||
 	die "--domain should be a bare hostname like git.example.com"
 [[ -z $EMAIL || $EMAIL =~ ^[^[:space:]\"{}]+@[A-Za-z0-9.-]+$ ]] || die "--email doesn't look like an email address"
-((DENY_FORCE_PUSH && ${#PUSH_KEYS[@]} == 0)) && die "--deny-force-push goes with --push-key"
-((MANAGE_REPOS && ${#PUSH_KEYS[@]} == 0)) && die "--manage-repos goes with --push-key"
+((DENY_FORCE_PUSH && ${#PUSH_KEYS[@]} + ${#GITHUB_USERS[@]} == 0)) && die "--deny-force-push goes with --push-key or --github-keys"
+((MANAGE_REPOS && ${#PUSH_KEYS[@]} + ${#GITHUB_USERS[@]} == 0)) && die "--manage-repos goes with --push-key or --github-keys"
+for u in "${GITHUB_USERS[@]}"; do
+	is_github_user "$u" || die "--github-keys: '$u' isn't a GitHub user name"
+done
 # Written into canopy-update and handed to git as root's choice: keep it a
 # plain https URL (no options, no ext:: or file transports).
 [[ $UPDATE_FROM =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$ ]] ||
@@ -369,7 +429,7 @@ if [[ -n $ADMIN_USER ]]; then
 fi
 [[ -z $ADMIN_KEY && -z $ADMIN_PW_HASH && -z $ADMIN_GITHUB ]] || [[ -n $ADMIN_USER ]] ||
 	die "--admin-key, --admin-github and --admin-password-hash go with --admin-user"
-[[ -z $ADMIN_GITHUB || $ADMIN_GITHUB =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]] ||
+[[ -z $ADMIN_GITHUB ]] || is_github_user "$ADMIN_GITHUB" ||
 	die "--admin-github: '$ADMIN_GITHUB' isn't a GitHub user name"
 ((GITHUB_SYNC && ${#GITHUB_USERS[@]} == 0)) && [[ -z $ADMIN_GITHUB ]] &&
 	die "--github-sync goes with --github-keys or --admin-github"
@@ -384,12 +444,27 @@ done
 return 0
 }
 
-if ((!DEPLOY && ${#GITHUB_USERS[@]})); then
-	GH_KEYS=$(mktemp)
-	for u in "${GITHUB_USERS[@]}"; do github_keys "$u" "$GH_KEYS"; done
-	PUSH_KEYS+=("$GH_KEYS")
-fi
 ((DEPLOY)) || check_options
+
+# On the server, the keys from GitHub are fetched first, before anything
+# changes, from the accounts github_account follows.
+GH_ADMIN_KEYS= # temporary file with the keys of --admin-github
+if ((!DEPLOY)) && [[ ${#GITHUB_USERS[@]} -gt 0 || -n $ADMIN_GITHUB ]]; then
+	load_github_ids
+	if ((${#GITHUB_USERS[@]})); then
+		GH_KEYS=$(mktemp)
+		for u in "${GITHUB_USERS[@]}"; do
+			github_account "$u"
+			github_keys "$u" "$GH_KEYS" "$GH_LOGIN"
+		done
+		PUSH_KEYS+=("$GH_KEYS")
+	fi
+	if [[ -n $ADMIN_GITHUB ]]; then
+		GH_ADMIN_KEYS=$(mktemp)
+		github_account "$ADMIN_GITHUB"
+		github_keys "$ADMIN_GITHUB" "$GH_ADMIN_KEYS" "$GH_LOGIN"
+	fi
+fi
 
 # ---------------------------------------------------------------------------
 # Deploying to a server over SSH (./install.sh user@host)
@@ -432,6 +507,13 @@ if ((DEPLOY)); then
 		done
 	}
 	given() { [[ $GIVEN == *" $1 "* ]]; }
+	# set_title <file> <title>: replace the line title = "git" in file with
+	# the title. awk takes it from the environment, as it is; in sed's
+	# replacement, & or | in it would mean something.
+	set_title() {
+		TITLE=$2 awk '$0 == "title = \"git\"" { $0 = "title = \"" ENVIRON["TITLE"] "\"" } { print }' "$1" >"$1.tmp"
+		mv "$1.tmp" "$1"
+	}
 
 	# Answers from the last run, offered as defaults.
 	declare -A saved=()
@@ -452,18 +534,21 @@ if ((DEPLOY)); then
 	stage=
 	keys=
 	gh=
-	push_files=()
+	pushing=0 # push keys or GitHub users given
 	title=
 	set_clone=0
 	set_about=0
 	set_signers=0
 	admin_hash=
+	ts_arg=
 	proceed=0
+	# The last line is no "test && command": false, that would fail the trap
+	# and so the whole run (set -e), when it went well.
 	# shellcheck disable=SC2329 # run by the EXIT trap
 	cleanup() {
 		ssh -o ControlPath="$ctl" -O exit "${ssh_opts[@]}" "$TARGET" 2>/dev/null || true
-		[[ -n $GH_KEYS ]] && rm -f "$GH_KEYS"
-		[[ -n $stage ]] && rm -rf "$stage"
+		[[ -z $GH_KEYS ]] || rm -f "$GH_KEYS"
+		[[ -z $stage ]] || rm -rf "$stage"
 	}
 	trap cleanup EXIT
 	say "Connecting to $TARGET"
@@ -539,16 +624,18 @@ if ((DEPLOY)); then
 			ask_yn GITHUB_SYNC "Keep them in sync (the server checks GitHub every 15 minutes, so keys added or removed there count without deploying again)" \
 				"${saved[github_sync]:-1}"
 		fi
-		push_files=("${PUSH_KEYS[@]}")
+		# Fetched here only to check the names, so a typo stops the run before
+		# anything is uploaded. The server fetches the keys itself, from the
+		# accounts it follows.
 		if ((${#GITHUB_USERS[@]})); then
 			GH_KEYS=$(mktemp)
 			for u in "${GITHUB_USERS[@]}"; do github_keys "$u" "$GH_KEYS"; done
-			PUSH_KEYS+=("$GH_KEYS")
 		fi
-		if ((${#PUSH_KEYS[@]})) && ! given deny_force_push; then
+		((${#PUSH_KEYS[@]} + ${#GITHUB_USERS[@]})) && pushing=1
+		if ((pushing)) && ! given deny_force_push; then
 			ask_yn DENY_FORCE_PUSH "Refuse pushes that rewrite or delete branches" "${saved[deny_force_push]:-1}"
 		fi
-		if ((${#PUSH_KEYS[@]})) && ! given manage_repos; then
+		if ((pushing)) && ! given manage_repos; then
 			ask_yn MANAGE_REPOS "Let push keys rename and delete repositories" "${saved[manage_repos]:-0}"
 		fi
 		if ! given self_update; then
@@ -681,11 +768,8 @@ if ((DEPLOY)); then
 		[[ -n $EMAIL ]] && args+=(--email "$EMAIL")
 		((ANUBIS)) && args+=(--anubis --challenge "$CHALLENGE")
 		((${#PUSH_KEYS[@]})) && args+=(--push-key push-keys.pub)
-		# In sync, the server fetches them itself from now on.
-		if ((GITHUB_SYNC)); then
-			for u in "${GITHUB_USERS[@]}"; do args+=(--github-keys "$u"); done
-			args+=(--github-sync)
-		fi
+		for u in "${GITHUB_USERS[@]}"; do args+=(--github-keys "$u"); done
+		((GITHUB_SYNC)) && args+=(--github-sync)
 		((DENY_FORCE_PUSH)) && args+=(--deny-force-push)
 		((MANAGE_REPOS)) && args+=(--manage-repos)
 		((SELF_UPDATE)) && args+=(--update-from "$UPDATE_FROM")
@@ -703,7 +787,7 @@ if ((DEPLOY)); then
 		note "action:  uninstall canopy"
 	else
 		note "site:    https://$DOMAIN$( ((ANUBIS)) && echo " with Anubis ($CHALLENGE)")"
-		push_desc=("${push_files[@]}" "${GITHUB_USERS[@]/#/github.com/}")
+		push_desc=("${PUSH_KEYS[@]}" "${GITHUB_USERS[@]/#/github.com/}")
 		note "push:    ${push_desc[*]:-nobody (no --push-key)}$( ((DENY_FORCE_PUSH)) && echo ', no force pushes')$( ((MANAGE_REPOS)) && echo ', rename/delete allowed')"
 		((GITHUB_SYNC)) && note "github:  keys kept in sync, checked every 15 minutes"
 		note "harden:  $( ((HARDEN)) && echo yes || echo no)"
@@ -743,7 +827,7 @@ if ((DEPLOY)); then
 			note "added [signatures.github] for ${GITHUB_USERS[*]} to config/canopy.toml"
 		fi
 		if [[ -n $title ]] && ((!DRY_RUN)); then
-			sed "s|^title = \"git\"\$|title = \"$title\"|" "$cfg" >"$cfg.tmp" && mv "$cfg.tmp" "$cfg"
+			set_title "$cfg" "$title"
 			note "set title = \"$title\" in config/canopy.toml"
 		fi
 		if ((set_clone && !DRY_RUN)); then
@@ -762,7 +846,7 @@ if ((DEPLOY)); then
 				echo "email=$EMAIL"
 				echo "anubis=$ANUBIS"
 				echo "challenge=$CHALLENGE"
-				echo "push_keys=$(IFS=,; echo "${push_files[*]:-none}")"
+				echo "push_keys=$(IFS=,; echo "${PUSH_KEYS[*]:-none}")"
 				echo "github=$(IFS=,; echo "${GITHUB_USERS[*]:-none}")"
 				echo "github_sync=$GITHUB_SYNC"
 				echo "signers=$set_signers"
@@ -796,7 +880,6 @@ if ((DEPLOY)); then
 		[[ -n $ADMIN_USER && -n $ADMIN_KEY ]] && cp "$ADMIN_KEY" "$stage/admin-keys.pub"
 		# The auth key travels with this run only: it isn't part of
 		# install-command.sh and is deleted on the server afterwards.
-		ts_arg=
 		if [[ -n $ts_key ]] && ((!DRY_RUN)); then
 			(umask 077 && printf '%s\n' "$ts_key" >"$stage/tailscale-authkey")
 			ts_arg=" --tailscale-key tailscale-authkey"
@@ -888,7 +971,7 @@ if ((DEPLOY)); then
 		fi
 	fi
 
-	if ((${#PUSH_KEYS[@]} && !DRY_RUN && !UNINSTALL)); then
+	if ((pushing && !DRY_RUN && !UNINSTALL)); then
 		# Same address and port as the target, as the git user.
 		git_target=git@$host
 		case $TARGET in ssh://*) git_target=ssh://git@${TARGET#ssh://*@} ;; esac
@@ -917,12 +1000,12 @@ if ((DEPLOY)); then
 		[[ -n $ADMIN_USER ]] && note "admin: log in as $ADMIN_USER and use sudo$( ((HARDEN)) && echo "; root can't log in over SSH once $ADMIN_USER has a password")"
 		if [[ -n $ts_host ]]; then
 			note "ssh:  only over Tailscale: ssh $login_user@$ts_host"
-			((${#PUSH_KEYS[@]})) && note "push: git remote add origin git@$ts_host:NAME.git  (new names are created on push)"
+			((pushing)) && note "push: git remote add origin git@$ts_host:NAME.git  (new names are created on push)"
 			note ""
 			note "Turn off key expiry for this machine in the Tailscale admin console"
 			note "(Machines, then the machine's menu: Disable key expiry), or SSH stops"
 			note "working when its key expires. Tagged machines don't expire."
-		elif ((${#PUSH_KEYS[@]})); then
+		elif ((pushing)); then
 			note "push: git remote add origin git@$DOMAIN:NAME.git  (new names are created on push)"
 		fi
 	fi
@@ -1035,6 +1118,35 @@ sshd_privsep() {
 }
 
 is_key_line() { [[ $1 =~ ^(ssh-|ecdsa-|sk-) ]]; }
+
+# MERGE_KEYS is an awk program for an authorized_keys file, given its lines
+# that aren't from GitHub and then the keys fetched from GitHub (labelled
+# github:USER). The first stay as they are, options and comments too, and
+# each key from GitHub is added unless the file has it already, with options
+# or without: a second copy without them would undo a from= or command= on
+# the first, as sshd goes on to the next line when a key's options turn a
+# login down. No single quotes in it: canopy-github-keys quotes it in them.
+# shellcheck disable=SC2016 # awk's $i, not the shell's
+MERGE_KEYS='
+function key(   i) {
+	for (i = 1; i < NF; i++)
+		if ($i ~ /^(ssh-|ecdsa-|sk-)/)
+			return $i " " $(i + 1)
+	return ""
+}
+!NF { next }
+/^[ \t]*#/ { print; next }
+/[ \t]github:[A-Za-z0-9-]+$/ {
+	k = key()
+	if (k != "" && !seen[k]++)
+		print
+	next
+}
+{
+	if ((k = key()) != "")
+		seen[k] = 1
+	print
+}'
 
 # remove_self_update: canopy-update, its Go, and its clone and caches (kept
 # by systemd under /var/lib/private, as it runs with DynamicUser).
@@ -1420,9 +1532,11 @@ if ((CADDY)); then
 		echo "	header ?X-Frame-Options DENY"
 		echo "	encode zstd gzip"
 		echo "	reverse_proxy $backend {"
+		# Set here, never passed on from the visitor: canopy's per-visitor
+		# limits (and Anubis) go by it.
+		echo "		header_up X-Real-IP {remote_host}"
 		if ((ANUBIS)); then
-			echo "		# Anubis identifies clients by these headers."
-			echo "		header_up X-Real-IP {remote_host}"
+			echo "		# Anubis identifies clients by these too."
 			echo "		header_up X-Http-Version {http.request.proto}"
 			echo "		header_up X-TLS-SNI-Name {http.request.tls.server_name}"
 		fi
@@ -1597,6 +1711,19 @@ if ((TAILSCALE)); then
 		TS_HOST=${TS_HOST:-$TS_IP}
 		note "this server is $TS_HOST ($TS_IP) in the tailnet"
 	fi
+fi
+
+# ---------------------------------------------------------------------------
+# The GitHub accounts behind --github-keys and --admin-github, kept for the
+# next run and canopy-github-keys (see github_account).
+
+if ((${#GH_ID[@]})); then
+	{
+		echo "# Written by install.sh: the GitHub account each name named when it was first"
+		echo "# given, by ID. Keys come from these accounts, whatever they are called now,"
+		echo "# not from whoever has the name. Remove a line to look the name up again."
+		for u in "${!GH_ID[@]}"; do echo "$u ${GH_ID[$u]}"; done | sort
+	} | write "$GH_IDS" 0644
 fi
 
 # ---------------------------------------------------------------------------
@@ -2338,14 +2465,13 @@ if [[ -n $ADMIN_USER ]]; then
 	gh_lines='[[:space:]]github:[A-Za-z0-9-]+$'
 	others=$(grep -Ev "$gh_lines" "$admin_keys" 2>/dev/null || true)
 	if [[ -n $ADMIN_GITHUB ]]; then
-		gh_admin=$(mktemp)
-		github_keys "$ADMIN_GITHUB" "$gh_admin"
 		admin_group=$(id -gn "$ADMIN_USER" 2>/dev/null || echo "$ADMIN_USER")
 		run install -d -m 0700 -o "$ADMIN_USER" -g "$admin_group" "$admin_home/.ssh"
-		printf '%s\n' "$others" | cat - "$gh_admin" | grep -E '^(ssh-|ecdsa-|sk-)' |
-			awk '!seen[$1 " " $2]++' | write "$admin_keys" 0600
+		# The account's other lines stay as they are (MERGE_KEYS); the keys
+		# from GitHub were fetched at the start.
+		printf '%s\n' "$others" | cat - "$GH_ADMIN_KEYS" | awk "$MERGE_KEYS" | write "$admin_keys" 0600
 		run chown "$ADMIN_USER:$admin_group" "$admin_keys"
-		rm -f "$gh_admin"
+		rm -f "$GH_ADMIN_KEYS"
 	elif grep -Eq "$gh_lines" "$admin_keys" 2>/dev/null; then
 		if grep -Eq '^(ssh-|ecdsa-|sk-)' <<<"$others"; then
 			note "removing the keys taken from GitHub (no --admin-github any more)"
@@ -2393,57 +2519,92 @@ if [[ -n $ADMIN_USER ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# --github-sync: canopy-github-keys fetches the keys of the GitHub users
+# --github-sync: canopy-github-keys fetches the keys of the GitHub accounts
 # named with --github-keys and --admin-github every 15 minutes, and puts them
 # where they let in: $GIT_KEYS for pushes, the admin's authorized_keys for
 # logins. It only replaces the lines labelled github:USER, so keys from
 # --push-key and --admin-key stay. When GitHub can't be reached, nothing
-# changes; a key removed on GitHub stops working at the next check.
+# changes; a key removed on GitHub stops working at the next check. Like
+# install.sh, it follows each account by its ID (github_account).
 
 if ((GITHUB_SYNC)); then
 	say "Keeping the keys from GitHub in sync"
 	{
-		echo "# Written by install.sh: the GitHub users whose keys $GH_SYNC_CMD follows."
-		echo "# push USER: may push; admin ACCOUNT USER: may log in as ACCOUNT."
+		echo "# Written by install.sh: the GitHub accounts whose keys $GH_SYNC_CMD follows,"
+		echo "# by the name they were first given as and their ID ($GH_IDS)."
+		echo "# push USER ID: may push; admin ACCOUNT USER ID: may log in as ACCOUNT."
 		if ((${#PUSH_KEYS[@]})); then
-			for u in "${GITHUB_USERS[@]}"; do echo "push $u"; done
+			for u in "${GITHUB_USERS[@]}"; do echo "push $u ${GH_ID[${u,,}]}"; done
 		fi
 		# An if, not &&: a false test ending the group would fail the
 		# pipeline (pipefail) and stop the install here, with no message.
 		if [[ -n $ADMIN_GITHUB ]]; then
-			echo "admin $ADMIN_USER $ADMIN_GITHUB"
+			echo "admin $ADMIN_USER $ADMIN_GITHUB ${GH_ID[${ADMIN_GITHUB,,}]}"
 		fi
 	} | write "$GH_SYNC_CONF" 0644
 	{
 		cat <<EOF
 #!/usr/bin/env bash
 # canopy-github-keys, written by install.sh: fetches the SSH keys of the
-# GitHub users in $GH_SYNC_CONF (https://github.com/USER.keys) and
+# GitHub accounts in $GH_SYNC_CONF (https://github.com/USER.keys) and
 # replaces the lines labelled github:USER with them: in $GIT_KEYS
 # (pushes) and in an admin account's authorized_keys (logins). Other lines
-# stay. A file is left alone when any of its users can't be fetched, and an
-# admin's keys are never emptied, which would lock the account out.
+# stay. Each account is followed by its ID, not by its name: a renamed or
+# deleted account's name is free for anyone to register. A file is left
+# alone when any of its accounts can't be checked, and an admin's keys are
+# never emptied, which would lock the account out.
 set -euo pipefail
 conf=$GH_SYNC_CONF
 git_keys=$GIT_KEYS
 EOF
+		echo "# shellcheck disable=SC2016 # awk's \$i, not the shell's"
+		printf "merge_keys='%s'\n" "$MERGE_KEYS"
 		cat <<'EOF'
 status=0
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# fetch USER: print USER's valid keys, labelled github:USER, or fail. A user
-# GitHub doesn't have (any more) has none.
-fetch() {
-	local user=$1 code line
-	[[ $user =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]] || { echo "$conf: '$user' isn't a GitHub user name" >&2; return 1; }
-	code=$(curl -sS --max-time 20 --proto =https -o "$tmp/body" -w '%{http_code}' "https://github.com/$user.keys") ||
-		{ echo "github.com/$user: couldn't connect" >&2; return 1; }
+valid_user() { [[ $1 =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]]; }
+
+# json_field NAME: the first "NAME": value in the JSON on stdin.
+json_field() {
+	grep -oE "\"$1\": *(\"[^\"]*\"|[0-9]+)" | sed -n '1{s/^"[^"]*": *//; s/^"//; s/"$//; p;}' || true
+}
+
+# look_up USER ID: set name[ID] to what account ID (first given as USER) is
+# called now, or to "" when it is gone; fail when GitHub can't say. Each
+# account is asked about once a run: GitHub allows 60 requests an hour.
+declare -A name=()
+look_up() {
+	local user=$1 id=$2 code login
+	valid_user "$user" && [[ $id =~ ^[1-9][0-9]*$ ]] ||
+		{ echo "$conf: '$user $id' isn't a GitHub user name and account ID; run install.sh again" >&2; return 1; }
+	[[ -v name[$id] ]] && return 0
+	code=$(curl -sS --max-time 20 --proto =https -H 'Accept: application/vnd.github+json' \
+		-o "$tmp/account" -w '%{http_code}' "https://api.github.com/user/$id") ||
+		{ echo "github.com/$user: couldn't reach api.github.com" >&2; return 1; }
 	case $code in
 	200) ;;
-	404) echo "github.com/$user: no such user; none of its keys count" >&2; return 0 ;;
-	*) echo "github.com/$user: HTTP $code" >&2; return 1 ;;
+	404)
+		echo "github.com/$user: its account (ID $id) is gone; none of its keys count" >&2
+		name[$id]=
+		return 0
+		;;
+	*) echo "github.com/$user: HTTP $code from api.github.com" >&2; return 1 ;;
 	esac
+	login=$(json_field login <"$tmp/account")
+	valid_user "$login" || { echo "github.com/$user: no account name in api.github.com's answer" >&2; return 1; }
+	[[ ${login,,} == "${user,,}" ]] || echo "github.com/$user is now called $login (the same account, ID $id)" >&2
+	name[$id]=$login
+}
+
+# keys USER LOGIN: print the valid keys of github.com/LOGIN, labelled
+# github:USER, or fail.
+keys() {
+	local user=$1 login=$2 code line type blob
+	code=$(curl -sS --max-time 20 --proto =https -o "$tmp/body" -w '%{http_code}' "https://github.com/$login.keys") ||
+		{ echo "github.com/$login: couldn't connect" >&2; return 1; }
+	[[ $code == 200 ]] || { echo "github.com/$login: HTTP $code" >&2; return 1; }
 	while IFS= read -r line; do
 		line=${line%$'\r'}
 		[[ $line =~ ^(ssh-|ecdsa-|sk-) ]] || continue
@@ -2453,23 +2614,25 @@ fetch() {
 	done <"$tmp/body"
 }
 
-# update FILE PREFIX MIN USER...: replace FILE's github: lines with the keys
-# of USER..., each line starting with PREFIX, keeping each key once. With MIN
-# set, refuse to leave FILE without any key.
+# update FILE PREFIX MIN USER:ID...: replace FILE's github: lines with the
+# keys of those accounts, each line starting with PREFIX; the other lines
+# stay as they are (merge_keys). With MIN set, refuse to leave FILE without
+# any key.
 update() {
-	local file=$1 prefix=$2 min=$3 user lines new next
+	local file=$1 prefix=$2 min=$3 account user id lines new next
 	shift 3
 	[[ -L $file || -L $(dirname "$file") ]] && { echo "$file: a symbolic link; not touching it" >&2; return 1; }
 	[[ -f $file ]] || { echo "$file: missing; run install.sh again" >&2; return 1; }
 	lines=
-	for user in "$@"; do
-		lines+=$(fetch "$user") || { echo "$file: unchanged" >&2; return 1; }
+	for account in "$@"; do
+		user=${account%:*} id=${account##*:}
+		look_up "$user" "$id" || { echo "$file: unchanged" >&2; return 1; }
+		[[ -n ${name[$id]:-} ]] || continue # gone: none of its keys count
+		lines+=$(keys "$user" "${name[$id]}") || { echo "$file: unchanged" >&2; return 1; }
 		lines+=$'\n'
 	done
 	new=$({ grep -Ev '[[:space:]]github:[A-Za-z0-9-]+$' "$file" 2>/dev/null || true
-		printf '%s' "$lines" | sed "/./s/^/$prefix/"; } |
-		awk '{ k = $0; sub(/^restrict /, "", k); split(k, f, " ") }
-			/^[^#]/ && seen[f[1] " " f[2]]++ { next } NF { print }')
+		printf '%s' "$lines" | sed "/./s/^/$prefix/"; } | awk "$merge_keys")
 	if ((min)) && ! grep -Eq '(^|[[:space:]])(ssh-|ecdsa-|sk-)' <<<"$new"; then
 		echo "$file: GitHub lists no keys; keeping the ones it has, so the account isn't locked out" >&2
 		return 0
@@ -2487,10 +2650,10 @@ update() {
 
 push=()
 declare -A admins=()
-while read -r kind a b; do
+while read -r kind a b c; do
 	case $kind in
-	push) push+=("$a") ;;
-	admin) admins[$a]+="$b " ;;
+	push) push+=("$a:$b") ;;
+	admin) admins[$a]+="$b:$c " ;;
 	esac
 done < <(grep -v '^#' "$conf")
 

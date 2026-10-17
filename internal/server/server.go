@@ -395,18 +395,54 @@ func splitItem(segs []string) (ref, p string) {
 	return strings.Join(segs, "/"), ""
 }
 
+// cloneConfig keeps clones to the branches and tags, as the pages are: other
+// refs (a host's refs/pull/*, notes, a stash) aren't listed, and nothing
+// the listed ones don't lead to can be asked for, whatever the repository's
+// own config allows (false turns off the tip and reachable variants too).
+var cloneConfig = [][2]string{
+	{"uploadpack.hideRefs", "refs"},
+	{"uploadpack.hideRefs", "!refs/heads"},
+	{"uploadpack.hideRefs", "!refs/tags"},
+	{"uploadpack.allowAnySHA1InWant", "false"},
+}
+
 func (s *Server) gitHTTP(w http.ResponseWriter, r *http.Request, repo *Repo, pathInfo string) {
 	r2 := r.Clone(r.Context())
 	r2.URL.Path = pathInfo
+	// git's protocol v2 hands out any object a client names by its hash,
+	// even a commit no branch or tag holds any more (one force-pushed over),
+	// which no page shows. Without the header asking for it, http-backend
+	// speaks v0, which sends only what the refs it lists lead to. The header
+	// goes under every name cgi would pass as HTTP_GIT_PROTOCOL, such as
+	// Git_Protocol.
+	for name := range r2.Header {
+		if cgiName(name) == "GIT_PROTOCOL" {
+			delete(r2.Header, name)
+		}
+	}
 	h := &cgi.Handler{
 		Path: s.gitPath,
 		Args: []string{"http-backend"},
-		Env: append(git.Env(),
+		Env: append(git.Env(cloneConfig...),
 			"GIT_PROJECT_ROOT="+repo.Dir,
 			"GIT_HTTP_EXPORT_ALL=1",
 		),
 	}
 	h.ServeHTTP(w, r2)
+}
+
+// cgiName is the name net/http/cgi gives a request header in a program's
+// environment, after "HTTP_".
+func cgiName(header string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case 'a' <= r && r <= 'z':
+			return r - 'a' + 'A'
+		case r == '-' || r == '=':
+			return '_'
+		}
+		return r
+	}, header)
 }
 
 // resolve maps a ref from the URL to a commit, defaulting to HEAD's branch.

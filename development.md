@@ -182,6 +182,12 @@ shellcheck install.sh update.sh
 
 `gofmt -l .` prints the files it would change; no output means clean.
 
+On Linux, `go test .` also runs install.sh (`install_test.go`): its deploy
+and install as dry runs, with fake `ssh`, `curl` (a GitHub of the test's
+own), `id` and `getent` first on the `PATH`, and the `canopy-github-keys`
+script it writes against files in a temporary folder. Nothing leaves the
+machine and nothing on it changes. Elsewhere those tests are skipped.
+
 `canopy-update` (`install.sh --self-update`) needs root and systemd, which
 WSL has. To try it without installing canopy, run install.sh's
 "canopy-update" section with its paths pointed at a folder like

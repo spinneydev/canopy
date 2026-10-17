@@ -238,20 +238,29 @@ push.
 
 If your keys are on GitHub, you can skip copying them: give your GitHub user
 name when asked "Also allow the SSH keys of GitHub users to push" (or pass
-`--github-keys USER`). Each deploy fetches `https://github.com/USER.keys`
-again, so a key added to or removed from GitHub counts from the next deploy.
-Answer yes to "Keep them in sync" (`--github-sync`) and you needn't deploy
-at all: the server checks GitHub every 15 minutes, so a new laptop's key
-works a quarter of an hour after you add it on GitHub, and a key you remove
-there stops working as soon. If GitHub can't be reached, the keys stay as
-they were. Anyone who can add keys to that GitHub account can then push here
-too.
+`--github-keys USER`). Each deploy has the server fetch
+`https://github.com/USER.keys` again, so a key added to or removed from
+GitHub counts from the next deploy. Answer yes to "Keep them in sync"
+(`--github-sync`) and you needn't deploy at all: the server checks GitHub
+every 15 minutes, so a new laptop's key works a quarter of an hour after you
+add it on GitHub, and a key you remove there stops working as soon. If
+GitHub can't be reached, the keys stay as they were. Anyone who can add keys
+to that GitHub account can then push here too.
+
+The server remembers which account the name belonged to, by its ID, the
+first time (in `/etc/canopy/github-ids`), and keeps taking the keys of that
+account: renaming yours on GitHub changes nothing here, and if someone
+registers the name you gave up, their keys don't count. Once the account is
+deleted, the sync drops its keys at its next check, and deploys stop, saying
+why, until you leave the name out. To switch to a new account under the same
+name, remove the name's line from that file on the server and deploy again.
 
 The same works for logging in to the server: "GitHub user whose SSH keys can
 also log in as alice" (`--admin-github USER`) adds that user's GitHub keys to
 the admin account, and with `--github-sync` keeps them current. sudo still
 asks for the account's password. The sync never takes the account's last key
-away (that would lock you out); keys from `--admin-key` always stay.
+away (that would lock you out); keys from `--admin-key`, and lines you added
+yourself (with options like `from="…"` too), always stay.
 
 And for signature badges: answer yes to "Show their commits and tags signed
 with an SSH signing key they keep on GitHub as verified" and the deploy adds
